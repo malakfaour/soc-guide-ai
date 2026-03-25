@@ -179,3 +179,7 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Dataset files - ignore raw data but keep folder structure
+data/raw/*
+!data/raw/.gitkeep
