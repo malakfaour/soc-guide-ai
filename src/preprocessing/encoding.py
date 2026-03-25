@@ -322,8 +322,9 @@ def encode_features(
     
     print(f"✓ Encoding complete")
     return X_train_encoded, X_test_encoded, encoder_info
-=======
+"""
 Minimal encoding module.
+
 - Frequency encoding for categorical features ONLY
 - Label mapping for target: TP->2, BP->1, FP->0
 - NO target encoding, NO one-hot encoding

@@ -255,12 +255,15 @@ def load_split_indices(
         'test_indices': test_indices,
         **metadata
     }
-=======
-Data splitting module.
-- Stratified split on target after encoding
-- Create train/test split first
-- Then create validation split from training portion
+    
 """
+Data splitting module.
+
+Stratified split on target after encoding.
+Create train/test split first.
+Then create validation split from training portion.
+"""
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split

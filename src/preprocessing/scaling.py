@@ -250,8 +250,9 @@ def get_scaling_stats(
             }
     
     return stats
-=======
+"""
 Data scaling module.
+
 - Optional QuantileTransformer for numeric features
 - NOT applied for XGBoost and LightGBM
 - Only for TabNet and advanced models
