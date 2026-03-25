@@ -1,17 +1,14 @@
-# soc-guide-ai
-# SOC Guide AI
 
-AI system for SOC incident triage and remediation using Microsoft GUIDE dataset.
+# SOC GUIDE AI Project
 
-## 🚀 Project Overview
-This project aims to build an intelligent system that:
-- Classifies cybersecurity incidents (triage)
-- Predicts severity levels
-- Suggests remediation actions
+This project implements 3 models for SOC incident classification:
 
-## 🧠 Models Used
-- CatBoost (ML) → Triage classification
-- Deep Learning Model → Advanced triage
-- Multi-label Model → Remediation prediction
+- XGBoost
+- LightGBM
+- TabNet
 
-## 📁 Project Structure
+## Current Status
+Project structure initialized. Implementation will be added step-by-step.
+
+## How to Use
+Coming soon...
