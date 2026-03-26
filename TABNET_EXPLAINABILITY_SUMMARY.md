@@ -9,7 +9,7 @@
 
 ## Overview
 
-A complete, production-ready explainability module for PyTorch TabNet models in the SOC-Guide AI project. The implementation extracts feature importance from TabNet's attention masks and provides comprehensive visualizations and analysis tools.
+A complete, production-ready explainability module for PyTorch TabNet models in the SOC Intelligence project. The implementation extracts feature importance from TabNet's attention masks and provides comprehensive visualizations and analysis tools.
 
 ---
 

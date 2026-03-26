@@ -225,9 +225,114 @@ def get_data_info() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    """Main execution - load and validate data"""
+    """Main execution - complete training pipeline"""
+    import sys
+    import json
+    from pathlib import Path
+    
+    # Add src/models/tabnet to path for imports
+    sys.path.insert(0, str(Path(__file__).parent.parent / "models" / "tabnet"))
+    sys.path.insert(0, str(Path(__file__).parent.parent / "evaluation"))
+    
     try:
+        # ===== STEP 1: LOAD AND VALIDATE DATA =====
+        print("\n" + "=" * 60)
+        print("TABNET TRAINING PIPELINE")
+        print("=" * 60)
+        
         X_train, X_val, X_test, y_train, y_val, y_test = load_tabnet_data()
+        
+        # ===== STEP 2: SCALE FEATURES =====
+        print("\n")
+        from train import scale_tabnet_features
+        
+        X_train_scaled, X_val_scaled, X_test_scaled, scaler = scale_tabnet_features(
+            X_train, X_val, X_test, verbose=True
+        )
+        
+        # ===== STEP 3: TRAIN TABNET MODEL =====
+        print("\n")
+        from train import train_tabnet_triage_model
+        
+        model, results = train_tabnet_triage_model(
+            X_train_scaled, X_val_scaled, X_test_scaled,
+            y_train, y_val, y_test,
+            verbose=True
+        )
+        
+        # ===== STEP 4: SAVE TRAINED MODEL =====
+        print("\n")
+        from utils import save_tabnet_model
+        
+        artifact_paths = save_tabnet_model(
+            model=model,
+            scaler=scaler,
+            class_weights=results['class_weights'],
+            model_dir="models/tabnet",
+            model_name="triage_model",
+            verbose=True
+        )
+        
+        # ===== STEP 5: RUN EVALUATION AND SAVE METRICS =====
+        print("\n")
+        from metrics import TriageEvaluator
+        
+        # Extract predictions from results
+        y_pred_test = results['predictions']['test']
+        y_proba_test = results['probabilities']['test']
+        
+        # Compute metrics
+        evaluator = TriageEvaluator(n_classes=results['metrics']['n_classes'])
+        test_metrics = evaluator.compute_metrics(
+            y_true=y_test,
+            y_pred=y_pred_test,
+            y_proba=y_proba_test
+        )
+        
+        # Display formatted metrics
+        formatted_metrics = evaluator.format_results(test_metrics)
+        print(formatted_metrics)
+        
+        # Save metrics to file
+        metrics_dir = Path("reports/metrics")
+        metrics_dir.mkdir(parents=True, exist_ok=True)
+        
+        metrics_file = metrics_dir / "triage_metrics.json"
+        with open(metrics_file, 'w') as f:
+            json.dump(test_metrics, f, indent=2)
+        
+        print(f"\n[SAVE] Metrics saved: {metrics_file}")
+        
+        # ===== SUMMARY =====
+        print("\n" + "=" * 60)
+        print("✓ TRAINING PIPELINE COMPLETE")
+        print("=" * 60)
+        print(f"\n[ARTIFACTS SAVED]")
+        print(f"  Model: {artifact_paths.get('model', 'models/tabnet/triage_model.pkl')}")
+        print(f"  Scaler: {artifact_paths.get('scaler', 'models/tabnet/triage_model_scaler.pkl')}")
+        print(f"  Config: {artifact_paths.get('config', 'models/tabnet/triage_model_config.json')}")
+        print(f"  Metrics: {metrics_file}")
+        
+        print(f"\n[TRAINING RESULTS]")
+        print(f"  Training samples: {results['metrics']['train_samples']}")
+        print(f"  Validation samples: {results['metrics']['val_samples']}")
+        print(f"  Test samples: {results['metrics']['test_samples']}")
+        print(f"  Features: {results['metrics']['n_features']}")
+        print(f"  Classes: {results['metrics']['n_classes']}")
+        
+        print(f"\n[ACCURACIES]")
+        print(f"  Train: {results['accuracy']['train']:.4f}")
+        print(f"  Validation: {results['accuracy']['val']:.4f}")
+        print(f"  Test: {results['accuracy']['test']:.4f}")
+        
+        print(f"\n[TEST METRICS]")
+        print(f"  Macro-F1: {test_metrics['macro_f1']:.4f}")
+        print(f"  Overall Accuracy: {test_metrics['overall_accuracy']:.4f}")
+        
+        print("\n" + "=" * 60)
+        
     except Exception as e:
         print(f"\n[ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise

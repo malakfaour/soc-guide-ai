@@ -1,5 +1,7 @@
 
-# SOC GUIDE AI Project
+# SOC Intelligence
+
+A machine learning platform for SOC incident classification and explainability analysis.
 
 This project implements 3 models for SOC incident classification:
 
