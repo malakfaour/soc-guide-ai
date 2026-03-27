@@ -18,14 +18,7 @@ try:
     import numpy as np
     import pandas as pd
     from sklearn.metrics import f1_score
-    # Try different import paths for TabNetClassifier
-    try:
-        from pytorch_tabnet.tab_classifier import TabNetClassifier
-    except (ImportError, ModuleNotFoundError):
-        try:
-            from pytorch_tabnet.tab_model import TabNetClassifier
-        except (ImportError, ModuleNotFoundError):
-            from torch_tabnet.tab_classifier import TabNetClassifier
+    from pytorch_tabnet.tab_model import TabNetClassifier
     
     import optuna
     from optuna.samplers import TPESampler

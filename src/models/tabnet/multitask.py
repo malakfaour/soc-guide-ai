@@ -17,9 +17,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "training"))
 
 try:
     from pytorch_tabnet.tab_network import TabNet
-except ImportError:
-    print("[ERROR] pytorch_tabnet not installed. Install with:")
-    print("  pip install pytorch-tabnet")
+except Exception as e:
+    print("[ERROR] Failed to import TabNet from pytorch_tabnet.tab_network")
+    print(f"  Root cause: {type(e).__name__}: {e}")
+    print("  Verify that both pytorch-tabnet and torch import cleanly.")
     sys.exit(1)
 
 

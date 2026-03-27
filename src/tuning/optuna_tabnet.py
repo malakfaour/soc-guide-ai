@@ -32,9 +32,10 @@ from utils import (
 )
 
 try:
-    from pytorch_tabnet.tab_classifier import TabNetClassifier
-except ImportError:
-    print("[ERROR] pytorch_tabnet not installed")
+    from pytorch_tabnet.tab_model import TabNetClassifier
+except Exception as e:
+    print("[ERROR] Failed to import TabNetClassifier from pytorch_tabnet.tab_model")
+    print(f"  Root cause: {type(e).__name__}: {e}")
     sys.exit(1)
 
 from sklearn.metrics import f1_score
@@ -161,6 +162,10 @@ class TabNetTuner:
                 lambda_sparse=params['lambda_sparse'],
                 momentum=params['momentum'],
                 seed=42,
+                optimizer_params={
+                    'lr': params['learning_rate'],
+                    'weight_decay': 1e-5,
+                },
                 verbose=0,
             )
             
@@ -169,14 +174,13 @@ class TabNetTuner:
                 X_train=self.X_train,
                 y_train=self.y_train,
                 eval_set=[(self.X_val, self.y_val)],
-                eval_metric=['auc'],
+                eval_metric=['accuracy'],
                 max_epochs=100,
                 patience=10,
                 batch_size=params['batch_size'],
                 virtual_batch_size=min(params['batch_size'] // 2, 128),
                 num_workers=0,
-                weight_decay=1e-5,
-                class_weights=self.class_weights_array,
+                weights=self.class_weights,
             )
             
             # Evaluate on validation set

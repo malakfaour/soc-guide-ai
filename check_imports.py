@@ -8,37 +8,37 @@ print("\n[Checking imports...]")
 try:
     print("  Checking pytorch_tabnet...")
     import pytorch_tabnet
-    print(f"    ✓ pytorch_tabnet found at: {pytorch_tabnet.__file__}")
-    print(f"    Available: {[x for x in dir(pytorch_tabnet) if not x.startswith('_')]}")
-except ImportError as e:
-    print(f"    ✗ pytorch_tabnet: {e}")
+    print(f"    [OK] pytorch_tabnet package loaded")
+    print(f"    Package path: {list(pytorch_tabnet.__path__)}")
+except Exception as e:
+    print(f"    [FAIL] pytorch_tabnet: {type(e).__name__}: {e}")
 
 try:
     print("  Checking torch...")
     import torch
-    print(f"    ✓ torch {torch.__version__}")
-except ImportError as e:
-    print(f"    ✗ torch: {e}")
+    print(f"    [OK] torch {torch.__version__}")
+except Exception as e:
+    print(f"    [FAIL] torch: {type(e).__name__}: {e}")
 
 try:
     print("  Checking optuna...")
     import optuna
-    print(f"    ✓ optuna {optuna.__version__}")
-except ImportError as e:
-    print(f"    ✗ optuna: {e}")
+    print(f"    [OK] optuna {optuna.__version__}")
+except Exception as e:
+    print(f"    [FAIL] optuna: {type(e).__name__}: {e}")
 
 try:
     print("  Checking sklearn...")
     import sklearn
-    print(f"    ✓ sklearn {sklearn.__version__}")
-except ImportError as e:
-    print(f"    ✗ sklearn: {e}")
+    print(f"    [OK] sklearn {sklearn.__version__}")
+except Exception as e:
+    print(f"    [FAIL] sklearn: {type(e).__name__}: {e}")
 
 print("\n[Attempting TabNetClassifier import...]")
 try:
     from pytorch_tabnet.tab_model import TabNetClassifier
-    print("  ✓ TabNetClassifier imported from pytorch_tabnet.tab_model")
+    print("  [OK] TabNetClassifier imported from pytorch_tabnet.tab_model")
 except Exception as e:
-    print(f"  ✗ Failed: {e}")
+    print(f"  [FAIL] {type(e).__name__}: {e}")
 
 print("\nDone!")
