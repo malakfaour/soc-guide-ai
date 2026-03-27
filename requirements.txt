@@ -1,9 +1,6 @@
+streamlit
 pandas
 numpy
+lightgbm
 scikit-learn
-matplotlib
-seaborn
-jupyter
-catboost
-torch
-shap
+joblib
