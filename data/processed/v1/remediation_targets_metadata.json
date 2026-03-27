@@ -1,0 +1,124 @@
+{
+  "label_names": [
+    "ActionGrouped=ContainAccount",
+    "ActionGrouped=IsolateDevice",
+    "ActionGranular=update stsrefreshtokenvalidfrom timestamp.",
+    "ActionGranular=isolateresponse",
+    "ActionGranular=account password changed",
+    "ActionGranular=change user password.",
+    "ActionGranular=quarantinefile",
+    "ActionGranular=disable account.",
+    "ActionGranular=reset user password."
+  ],
+  "label_definitions": [
+    {
+      "column": "ActionGrouped",
+      "value": 0.000452374968585
+    },
+    {
+      "column": "ActionGrouped",
+      "value": 0.000180949987434
+    },
+    {
+      "column": "ActionGranular",
+      "value": 0.0002211610957527
+    },
+    {
+      "column": "ActionGranular",
+      "value": 0.0001306861020356
+    },
+    {
+      "column": "ActionGranular",
+      "value": 9.047499371701432e-05
+    },
+    {
+      "column": "ActionGranular",
+      "value": 7.03694395576778e-05
+    },
+    {
+      "column": "ActionGranular",
+      "value": 5.026388539834129e-05
+    },
+    {
+      "column": "ActionGranular",
+      "value": 2.010555415933652e-05
+    },
+    {
+      "column": "ActionGranular",
+      "value": 3.0158331239004777e-05
+    }
+  ],
+  "baseline_values": {
+    "ActionGrouped": 0.9993666750439808,
+    "ActionGranular": 0.9993666750439808
+  },
+  "source_columns": [
+    "ActionGrouped",
+    "ActionGranular"
+  ],
+  "train_positive_counts": {
+    "ActionGrouped=ContainAccount": 32,
+    "ActionGrouped=IsolateDevice": 12,
+    "ActionGranular=update stsrefreshtokenvalidfrom timestamp.": 19,
+    "ActionGranular=isolateresponse": 8,
+    "ActionGranular=account password changed": 5,
+    "ActionGranular=change user password.": 5,
+    "ActionGranular=quarantinefile": 4,
+    "ActionGranular=disable account.": 2,
+    "ActionGranular=reset user password.": 1
+  },
+  "val_positive_counts": {
+    "ActionGrouped=ContainAccount": 5,
+    "ActionGrouped=IsolateDevice": 3,
+    "ActionGranular=update stsrefreshtokenvalidfrom timestamp.": 2,
+    "ActionGranular=isolateresponse": 3,
+    "ActionGranular=account password changed": 1,
+    "ActionGranular=change user password.": 1,
+    "ActionGranular=quarantinefile": 0,
+    "ActionGranular=disable account.": 0,
+    "ActionGranular=reset user password.": 1
+  },
+  "test_positive_counts": {
+    "ActionGrouped=ContainAccount": 8,
+    "ActionGrouped=IsolateDevice": 3,
+    "ActionGranular=update stsrefreshtokenvalidfrom timestamp.": 1,
+    "ActionGranular=isolateresponse": 2,
+    "ActionGranular=account password changed": 3,
+    "ActionGranular=change user password.": 1,
+    "ActionGranular=quarantinefile": 1,
+    "ActionGranular=disable account.": 0,
+    "ActionGranular=reset user password.": 1
+  },
+  "family_label_names": [
+    "account_response",
+    "endpoint_response"
+  ],
+  "family_train_positive_counts": {
+    "account_response": 32,
+    "endpoint_response": 12
+  },
+  "family_val_positive_counts": {
+    "account_response": 5,
+    "endpoint_response": 3
+  },
+  "family_test_positive_counts": {
+    "account_response": 8,
+    "endpoint_response": 3
+  },
+  "incident_family_label_names": [
+    "account_response",
+    "endpoint_response"
+  ],
+  "incident_family_train_positive_counts": {
+    "account_response": 5512,
+    "endpoint_response": 183
+  },
+  "incident_family_val_positive_counts": {
+    "account_response": 1183,
+    "endpoint_response": 24
+  },
+  "incident_family_test_positive_counts": {
+    "account_response": 1135,
+    "endpoint_response": 44
+  }
+}

@@ -80,10 +80,10 @@ class SharedTabNetEncoder(nn.Module):
             gamma=gamma,
             n_independent=n_independent,
             n_shared=n_shared,
-            lambda_sparse=lambda_sparse,
             epsilon=1e-15,
-            virtual_batch_size=None,
+            virtual_batch_size=128,
             momentum=0.02,
+            group_attention_matrix=torch.eye(n_features),
         )
     
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -220,6 +220,7 @@ class MultiTaskTabNet(nn.Module):
         n_a: int = 64,
         n_steps: int = 5,
         gamma: float = 1.5,
+        mode: str = "multitask",
     ):
         """
         Initialize multi-task TabNet model.
@@ -246,6 +247,7 @@ class MultiTaskTabNet(nn.Module):
         self.n_features = n_features
         self.n_triage_classes = n_triage_classes
         self.n_remediations = n_remediations
+        self.mode = mode
         
         # Shared encoder
         self.encoder = SharedTabNetEncoder(
@@ -281,11 +283,17 @@ class MultiTaskTabNet(nn.Module):
         """
         # Shared encoding
         encoded, M_loss = self.encoder(x)
-        
-        # Task predictions
-        triage_logits = self.triage_head(encoded)
-        remediation_logits = self.remediation_head(encoded)
-        
+
+        if self.mode == "triage_only":
+            triage_logits = self.triage_head(encoded)
+            remediation_logits = None
+        elif self.mode == "remediation_only":
+            triage_logits = None
+            remediation_logits = self.remediation_head(encoded)
+        else:
+            triage_logits = self.triage_head(encoded)
+            remediation_logits = self.remediation_head(encoded)
+
         return triage_logits, remediation_logits, M_loss
     
     def predict_proba(
@@ -309,11 +317,14 @@ class MultiTaskTabNet(nn.Module):
         self.eval()
         with torch.no_grad():
             triage_logits, remediation_logits, _ = self.forward(x)
-            
-            # Convert logits to probabilities
-            triage_proba = torch.softmax(triage_logits, dim=1).cpu().numpy()
-            remediation_proba = torch.sigmoid(remediation_logits).cpu().numpy()
-        
+
+            triage_proba = None
+            remediation_proba = None
+            if triage_logits is not None:
+                triage_proba = torch.softmax(triage_logits, dim=1).cpu().numpy()
+            if remediation_logits is not None:
+                remediation_proba = torch.sigmoid(remediation_logits).cpu().numpy()
+
         return triage_proba, remediation_proba
     
     def predict_triage(self, x: torch.Tensor) -> np.ndarray:
@@ -331,6 +342,8 @@ class MultiTaskTabNet(nn.Module):
             Predicted class indices (batch_size,)
         """
         triage_proba, _ = self.predict_proba(x)
+        if triage_proba is None:
+            raise RuntimeError("Triage predictions are unavailable in remediation_only mode")
         return np.argmax(triage_proba, axis=1)
     
     def predict_remediations(
@@ -354,6 +367,8 @@ class MultiTaskTabNet(nn.Module):
             Binary predictions for each remediation (batch_size, n_remediations)
         """
         _, remediation_proba = self.predict_proba(x)
+        if remediation_proba is None:
+            raise RuntimeError("Remediation predictions are unavailable in triage_only mode")
         return (remediation_proba >= threshold).astype(int)
     
     def rank_remediations(
@@ -377,6 +392,8 @@ class MultiTaskTabNet(nn.Module):
             For each sample, indices sorted by probability (descending)
         """
         _, remediation_proba = self.predict_proba(x)
+        if remediation_proba is None:
+            raise RuntimeError("Remediation rankings are unavailable in triage_only mode")
         ranked = []
         
         for probs in remediation_proba:
@@ -403,6 +420,10 @@ class MultiTaskLoss(nn.Module):
         triage_weight: float = 1.0,
         remediation_weight: float = 1.0,
         class_weights: Optional[np.ndarray] = None,
+        remediation_pos_weight: Optional[np.ndarray] = None,
+        remediation_loss_type: str = "bce",
+        remediation_focal_gamma: float = 2.0,
+        mode: str = "multitask",
     ):
         """
         Initialize multi-task loss.
@@ -420,6 +441,9 @@ class MultiTaskLoss(nn.Module):
         
         self.triage_weight = triage_weight
         self.remediation_weight = remediation_weight
+        self.remediation_loss_type = remediation_loss_type
+        self.remediation_focal_gamma = remediation_focal_gamma
+        self.mode = mode
         
         # Triage loss (multi-class)
         if class_weights is not None:
@@ -429,7 +453,20 @@ class MultiTaskLoss(nn.Module):
             self.triage_loss_fn = nn.CrossEntropyLoss()
         
         # Remediation loss (multi-label)
-        self.remediation_loss_fn = nn.BCEWithLogitsLoss()
+        if remediation_pos_weight is not None:
+            pos_weight_t = torch.tensor(
+                remediation_pos_weight,
+                dtype=torch.float32
+            )
+            self.remediation_loss_fn = nn.BCEWithLogitsLoss(
+                pos_weight=pos_weight_t
+            )
+        else:
+            self.remediation_loss_fn = nn.BCEWithLogitsLoss()
+        if remediation_pos_weight is not None:
+            self.register_buffer("remediation_pos_weight", pos_weight_t)
+        else:
+            self.remediation_pos_weight = None
     
     def forward(
         self,
@@ -458,19 +495,47 @@ class MultiTaskLoss(nn.Module):
             Total loss, triage loss, remediation loss
         """
         # Triage loss
-        triage_loss = self.triage_loss_fn(triage_logits, y_triage)
-        
-        # Remediation loss
-        remediation_loss = self.remediation_loss_fn(
-            remediation_logits,
-            y_remediation.float()
-        )
-        
-        # Combined loss
-        total_loss = (
-            self.triage_weight * triage_loss +
-            self.remediation_weight * remediation_loss
-        )
+        zero = torch.tensor(0.0, device=y_triage.device if y_triage is not None else y_remediation.device)
+        triage_loss = zero
+        remediation_loss = zero
+
+        if self.mode != "remediation_only":
+            triage_loss = self.triage_loss_fn(triage_logits, y_triage)
+
+        if self.mode != "triage_only":
+            if self.remediation_loss_type == "bce":
+                remediation_loss = self.remediation_loss_fn(
+                    remediation_logits,
+                    y_remediation.float()
+                )
+            elif self.remediation_loss_type == "focal":
+                bce_per_label = nn.functional.binary_cross_entropy_with_logits(
+                    remediation_logits,
+                    y_remediation.float(),
+                    pos_weight=self.remediation_pos_weight,
+                    reduction="none",
+                )
+                probabilities = torch.sigmoid(remediation_logits)
+                p_t = (
+                    probabilities * y_remediation.float() +
+                    (1.0 - probabilities) * (1.0 - y_remediation.float())
+                )
+                focal_factor = (1.0 - p_t).pow(self.remediation_focal_gamma)
+                remediation_loss = (focal_factor * bce_per_label).mean()
+            else:
+                raise ValueError(
+                    "remediation_loss_type must be 'bce' or 'focal'"
+                )
+
+        if self.mode == "triage_only":
+            total_loss = self.triage_weight * triage_loss
+        elif self.mode == "remediation_only":
+            total_loss = self.remediation_weight * remediation_loss
+        else:
+            total_loss = (
+                self.triage_weight * triage_loss +
+                self.remediation_weight * remediation_loss
+            )
         
         return total_loss, triage_loss, remediation_loss
 
@@ -480,6 +545,7 @@ def create_multitask_model(
     n_triage_classes: int,
     n_remediations: int,
     device: str = "cpu",
+    mode: str = "multitask",
     verbose: bool = True,
 ) -> MultiTaskTabNet:
     """
@@ -511,6 +577,7 @@ def create_multitask_model(
         print(f"  Input features: {n_features}")
         print(f"  Triage classes: {n_triage_classes}")
         print(f"  Remediation actions: {n_remediations}")
+        print(f"  Mode: {mode}")
         print(f"  Device: {device}")
     
     model = MultiTaskTabNet(
@@ -521,6 +588,7 @@ def create_multitask_model(
         n_a=64,
         n_steps=5,
         gamma=1.5,
+        mode=mode,
     )
     
     model = model.to(device)

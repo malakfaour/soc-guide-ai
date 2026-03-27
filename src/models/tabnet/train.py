@@ -138,7 +138,7 @@ def train_tabnet_triage_model(
         'epsilon': 1e-15,               # Batch norm epsilon
         'seed': 42,
         'optimizer_params': {'lr': 2e-2, 'weight_decay': 1e-5},
-        'verbose': 0,  # 0 for silent, 1 for epoch-level, 2 for detailed
+        'verbose': 1 if verbose else 0,  # TabNet logging is configured on the model
     }
     
     # Merge with custom params if provided

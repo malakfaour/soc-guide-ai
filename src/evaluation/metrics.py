@@ -190,10 +190,19 @@ class RemediationEvaluator:
         
         # Per-label F1 scores
         per_label_f1 = {}
+        per_label_precision = {}
+        per_label_recall = {}
         label_support = {}
         
         for i in range(self.n_remediations):
-            f1 = f1_score(y_true[:, i], y_pred[:, i], zero_division=0)
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                y_true[:, i],
+                y_pred[:, i],
+                average='binary',
+                zero_division=0
+            )
+            per_label_precision[self.label_names[i]] = float(precision)
+            per_label_recall[self.label_names[i]] = float(recall)
             per_label_f1[self.label_names[i]] = float(f1)
             label_support[self.label_names[i]] = int(np.sum(y_true[:, i]))
         
@@ -203,6 +212,9 @@ class RemediationEvaluator:
         
         results = {
             "hamming_loss": float(h_loss),
+            "subset_accuracy": float(np.all(y_true == y_pred, axis=1).mean()),
+            "per_label_precision": per_label_precision,
+            "per_label_recall": per_label_recall,
             "per_label_f1": per_label_f1,
             "micro_f1": float(micro_f1),
             "macro_f1": float(macro_f1),
@@ -230,6 +242,7 @@ class RemediationEvaluator:
             "REMEDIATION EVALUATION METRICS",
             "=" * 70,
             f"\nHamming Loss: {metrics['hamming_loss']:.4f}",
+            f"Subset Accuracy: {metrics['subset_accuracy']:.4f}",
             f"Micro-Averaged F1: {metrics['micro_f1']:.4f}",
             f"Macro-Averaged F1: {metrics['macro_f1']:.4f}",
             "\nPer-Label F1:",
@@ -237,15 +250,19 @@ class RemediationEvaluator:
         ]
         
         # Header
-        lines.append(f"{'Label':<25} {'F1':<12} {'Positive Samples':<20}")
+        lines.append(f"{'Label':<25} {'Precision':<12} {'Recall':<12} {'F1':<12} {'Positive Samples':<20}")
         lines.append("-" * 70)
         
         # Per-label data
         for label_name in self.label_names:
+            precision = metrics["per_label_precision"][label_name]
+            recall = metrics["per_label_recall"][label_name]
             f1 = metrics["per_label_f1"][label_name]
             support = metrics["label_support"][label_name]
             lines.append(
                 f"{label_name:<25} "
+                f"{precision:<12.4f} "
+                f"{recall:<12.4f} "
                 f"{f1:<12.4f} "
                 f"{support:<20d}"
             )
