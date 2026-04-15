@@ -1,0 +1,18 @@
+{
+  "class_weights": {
+    "0": 1.5377191820149287,
+    "1": 0.7706977464913446,
+    "2": 0.9504251805140385
+  },
+  "hyperparams": {
+    "n_d": 64,
+    "n_a": 64,
+    "n_steps": 5,
+    "gamma": 1.3,
+    "lambda_sparse": 0.001,
+    "max_epochs": 200,
+    "patience": 20,
+    "batch_size": 256,
+    "virtual_batch_size": 128
+  }
+}
