@@ -9,3 +9,7 @@ jupyter
 catboost
 torch
 shap
+fastapi
+uvicorn[standard]
+pydantic
+joblib

@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html>
+<head>
+      <meta charset="UTF-8">
+  <title>SOC Triage</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0c0f; --surface: #111318; --surface2: #181c23;
+    --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+    --text: #e8eaf0; --muted: #6b7280;
+    --accent: #3b82f6; --red: #ef4444; --amber: #f59e0b; --green: #22c55e;
+    --mono: 'JetBrains Mono', monospace; --sans: 'Syne', sans-serif;
+  }
+  body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+  .shell { display: grid; grid-template-rows: 52px 1fr; min-height: 100vh; }
+  .topbar { display: flex; align-items: center; gap: 12px; padding: 0 24px; border-bottom: 1px solid var(--border); background: var(--surface); }
+  .logo-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .logo-text { font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .topbar-sep { flex: 1; }
+  .status-pill { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); font-size: 11px; font-family: var(--mono); color: var(--green); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: pulse-green 2s ease-in-out infinite; }
+  @keyframes pulse-green { 0%,100%{opacity:1} 50%{opacity:.6} }
+  .main { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 52px); }
+  .form-panel { border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; overflow-y: auto; }
+  .panel-header { padding: 20px 24px 16px; border-bottom: 1px solid var(--border); }
+  .panel-title { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .panel-subtitle { font-size: 14px; font-weight: 600; }
+  .form-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; flex: 1; }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .field input, .field select, .field textarea { background: var(--surface2); border: 1px solid var(--border2); border-radius: 6px; color: var(--text); font-family: var(--mono); font-size: 12px; padding: 8px 12px; outline: none; transition: border-color 0.15s; width: 100%; }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+  .field select option { background: var(--surface2); }
+  .field textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .presets { display: flex; flex-direction: column; gap: 6px; }
+  .preset-btn { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); cursor: pointer; transition: all 0.15s; text-align: left; }
+  .preset-btn:hover { border-color: var(--border2); background: #1e2330; }
+  .preset-icon { font-size: 14px; flex-shrink: 0; }
+  .preset-name { font-size: 12px; font-weight: 600; color: var(--text); }
+  .preset-desc { font-size: 10px; color: var(--muted); margin-top: 1px; font-family: var(--mono); }
+  .preset-tag { margin-left: auto; padding: 2px 7px; border-radius: 3px; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-family: var(--mono); }
+  .tag-fp { background: rgba(34,197,94,0.1); color: #4ade80; }
+  .tag-bp { background: rgba(245,158,11,0.1); color: #fcd34d; }
+  .tag-tp { background: rgba(239,68,68,0.1); color: #f87171; }
+  .divider { height: 1px; background: var(--border); }
+  .submit-btn { width: 100%; padding: 12px; background: var(--accent); border: none; border-radius: 6px; color: #fff; font-family: var(--sans); font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .submit-btn:hover { background: #2563eb; }
+  .submit-btn:disabled { background: #1e2330; color: var(--muted); cursor: not-allowed; }
+  .spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; animation: spin 0.6s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .results-panel { display: flex; flex-direction: column; background: var(--bg); overflow-y: auto; }
+  .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 48px; opacity: 0.4; }
+  .empty-text { font-size: 13px; color: var(--muted); text-align: center; font-family: var(--mono); }
+  .results-content { padding: 24px; display: flex; flex-direction: column; gap: 18px; }
+  .verdict-card { border-radius: 10px; padding: 20px 24px; border: 1px solid transparent; animation: fadeUp 0.3s ease-out both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .verdict-card.tp { background: rgba(239,68,68,0.06); border-color: rgba(239,68,68,0.25); }
+  .verdict-card.fp { background: rgba(34,197,94,0.06); border-color: rgba(34,197,94,0.25); }
+  .verdict-card.bp { background: rgba(245,158,11,0.06); border-color: rgba(245,158,11,0.25); }
+  .verdict-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+  .verdict-label { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; font-family: var(--mono); margin-bottom: 6px; }
+  .verdict-label.tp { color: #f87171; } .verdict-label.fp { color: #4ade80; } .verdict-label.bp { color: #fcd34d; }
+  .verdict-title { font-size: 22px; font-weight: 800; }
+  .conf-num { font-size: 32px; font-weight: 800; font-family: var(--mono); text-align: right; }
+  .conf-num.tp { color: #ef4444; } .conf-num.fp { color: #22c55e; } .conf-num.bp { color: #f59e0b; }
+  .conf-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); text-align: right; }
+  .prob-section { display: flex; flex-direction: column; gap: 8px; }
+  .prob-row { display: flex; align-items: center; gap: 10px; }
+  .prob-name { font-size: 11px; font-family: var(--mono); color: var(--muted); width: 110px; flex-shrink: 0; }
+  .prob-bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
+  .prob-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease-out; }
+  .prob-val { font-size: 11px; font-family: var(--mono); width: 36px; text-align: right; }
+  .analysis-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; animation: fadeUp 0.35s ease-out both; }
+  .ac-header { padding: 10px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+  .ac-title { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-family: var(--mono); }
+  .ac-body { padding: 12px 16px; font-size: 13px; line-height: 1.65; color: #c9cdd8; }
+  .rem-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px 16px; }
+  .rem-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; }
+  .rem-label { font-size: 10px; font-family: var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .rem-val { font-size: 18px; font-weight: 700; font-family: var(--mono); }
+  .rem-val.yes { color: #f87171; } .rem-val.no { color: #4ade80; }
+  .rem-prob { font-size: 11px; color: var(--muted); font-family: var(--mono); margin-top: 2px; }
+  .warn-list { padding: 10px 16px; display: flex; flex-direction: column; gap: 4px; }
+  .warn-item { font-size: 11px; font-family: var(--mono); color: #fcd34d; }
+  ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="logo-dot"></div>
+    <span class="logo-text">SOC Triage · Live Model</span>
+    <div class="topbar-sep"></div>
+    <div class="status-pill"><div class="status-dot"></div>localhost:8000</div>
+  </div>
+
+  <div class="main">
+    <div class="form-panel">
+      <div class="panel-header">
+        <div class="panel-title">Alert Input</div>
+        <div class="panel-subtitle">Submit alert for triage</div>
+      </div>
+      <div class="form-body">
+
+        <div class="field">
+          <div class="field-label">Quick Presets</div>
+          <div class="presets">
+            <div class="preset-btn" onclick="loadPreset('ransomware')">
+              <span class="preset-icon">🔴</span>
+              <div><div class="preset-name">Ransomware Beacon</div><div class="preset-desc">PowerShell C2 egress, file encryption</div></div>
+              <span class="preset-tag tag-tp">TP</span>
+            </div>
+            <div class="preset-btn" onclick="loadPreset('scanner')">
+              <span class="preset-icon">🟡</span>
+              <div><div class="preset-name">Authorized Scan</div><div class="preset-desc">IT asset scanner, scheduled window</div></div>
+              <span class="preset-tag tag-bp">BP</span>
+            </div>
+            <div class="preset-btn" onclick="loadPreset('fp')">
+              <span class="preset-icon">🟢</span>
+              <div><div class="preset-name">Dev Tool Alert</div><div class="preset-desc">Whitelisted nmap from dev host</div></div>
+              <span class="preset-tag tag-fp">FP</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">Category</div>
+            <select id="Category">
+              <option>Malware</option><option>SuspiciousActivity</option>
+              <option>Ransomware</option><option>CommandAndControl</option>
+              <option>Exfiltration</option><option>LateralMovement</option>
+              <option>PrivilegeEscalation</option><option>Reconnaissance</option>
+              <option>DefenseEvasion</option><option>Collection</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label">Last Verdict</div>
+            <select id="LastVerdict">
+              <option value="">— unknown —</option>
+              <option>Malicious</option><option>Suspicious</option>
+              <option>Clean</option><option>Unknown</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">MITRE Technique</div>
+          <input type="text" id="MitreTechniques" placeholder="e.g. T1059.001" />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">IP Address</div>
+            <input type="text" id="IpAddress" placeholder="e.g. 185.234.219.3" />
+          </div>
+          <div class="field">
+            <div class="field-label">Suspicion Level</div>
+            <input type="number" id="SuspicionLevel" min="0" max="5" step="1" placeholder="0–5" />
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="field-label">File Name</div>
+          <input type="text" id="FileName" placeholder="e.g. powershell.exe" />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">Threat Family</div>
+            <input type="text" id="ThreatFamily" placeholder="e.g. Cobalt Strike" />
+          </div>
+          <div class="field">
+            <div class="field-label">OS Family</div>
+            <select id="OSFamily">
+              <option value="">— unknown —</option>
+              <option>Windows</option><option>Linux</option><option>macOS</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <div class="field-label">Entity Type</div>
+            <input type="text" id="EntityType" placeholder="e.g. Process" />
+          </div>
+          <div class="field">
+            <div class="field-label">Action Grouped</div>
+            <input type="text" id="ActionGrouped" placeholder="e.g. AlertDismissed" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;color:var(--muted)">
+            <input type="checkbox" id="include_remediation" style="width:auto" />
+            Include remediation prediction
+          </label>
+        </div>
+
+        <button class="submit-btn" id="submit-btn" onclick="runTriage()">
+          <span id="btn-text">▶ Run Triage</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="results-panel" id="results-panel">
+      <div class="empty-state" id="empty-state">
+        <div style="font-size:32px;filter:grayscale(1)">⬡</div>
+        <div class="empty-text">No alert submitted yet.<br/>Select a preset or fill in fields above.</div>
+      </div>
+      <div class="results-content" id="results-content" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_BASE = 'http://localhost:8000';
+
+  const PRESETS = {
+    ransomware: {
+      Category: 'CommandAndControl', MitreTechniques: 'T1059.001',
+      IpAddress: '185.234.219.3', SuspicionLevel: '5',
+      FileName: 'powershell.exe', ThreatFamily: 'Cobalt Strike',
+      OSFamily: 'Windows', LastVerdict: 'Malicious',
+      EntityType: 'Process', ActionGrouped: 'AlertDismissed',
+    },
+    scanner: {
+      Category: 'Reconnaissance', MitreTechniques: 'T1046',
+      IpAddress: '10.1.5.200', SuspicionLevel: '2',
+      FileName: 'nmap', ThreatFamily: '',
+      OSFamily: 'Linux', LastVerdict: 'Suspicious',
+      EntityType: 'Machine', ActionGrouped: 'AlertDismissed',
+    },
+    fp: {
+      Category: 'SuspiciousActivity', MitreTechniques: '',
+      IpAddress: '192.168.1.1', SuspicionLevel: '0',
+      FileName: 'nmap', ThreatFamily: '',
+      OSFamily: 'Windows', LastVerdict: 'Clean',
+      EntityType: 'Process', ActionGrouped: 'AlertDismissed',
+    }
+  };
+
+  function loadPreset(key) {
+    const p = PRESETS[key];
+    Object.entries(p).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    });
+  }
+
+  function getField(id) {
+    const el = document.getElementById(id);
+    if (!el) return undefined;
+    const v = el.value.trim();
+    return v === '' ? null : v;
+  }
+
+  async function runTriage() {
+    const btn = document.getElementById('submit-btn');
+    const btnText = document.getElementById('btn-text');
+    btn.disabled = true;
+    btnText.innerHTML = '<div class="spinner"></div> Analyzing...';
+
+    // Build payload — matches RawAlertRequest exactly
+    const payload = {
+      Category:         getField('Category'),
+      MitreTechniques:  getField('MitreTechniques'),
+      IpAddress:        getField('IpAddress'),
+      SuspicionLevel:   getField('SuspicionLevel') ? parseFloat(getField('SuspicionLevel')) : null,
+      FileName:         getField('FileName'),
+      ThreatFamily:     getField('ThreatFamily'),
+      OSFamily:         getField('OSFamily'),
+      LastVerdict:      getField('LastVerdict'),
+      EntityType:       getField('EntityType'),
+      ActionGrouped:    getField('ActionGrouped'),
+      include_remediation: document.getElementById('include_remediation').checked,
+    };
+
+    try {
+      const res = await fetch(`${API_BASE}/predict-raw`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      renderResults(data);
+    } catch (e) {
+      showError(e.message);
+    } finally {
+      btn.disabled = false;
+      btnText.textContent = '▶ Run Triage';
+    }
+  }
+
+  function renderResults(r) {
+    document.getElementById('empty-state').style.display = 'none';
+    const rc = document.getElementById('results-content');
+    rc.style.display = 'flex';
+
+    const vk = r.triage_label === 'TP' ? 'tp' : r.triage_label === 'FP' ? 'fp' : 'bp';
+    const conf = Math.round(r.confidence * 100);
+
+    const probs = r.class_probabilities || {};
+    const tpPct = Math.round((probs.TP || 0) * 100);
+    const bpPct = Math.round((probs.BP || 0) * 100);
+    const fpPct = Math.round((probs.FP || 0) * 100);
+
+    // Remediation section
+    let remHtml = '';
+    if (r.remediation_predictions) {
+      const acc = r.remediation_predictions.account_response;
+      const end = r.remediation_predictions.endpoint_response;
+      remHtml = `
+        <div class="analysis-card">
+          <div class="ac-header"><span class="ac-title">Remediation Predictions</span></div>
+          <div class="rem-grid">
+            <div class="rem-card">
+              <div class="rem-label">Account Response</div>
+              <div class="rem-val ${acc.prediction ? 'yes' : 'no'}">${acc.prediction ? 'REQUIRED' : 'NOT NEEDED'}</div>
+              <div class="rem-prob">Probability: ${Math.round(acc.probability * 100)}% (threshold ${Math.round(acc.threshold * 100)}%)</div>
+            </div>
+            <div class="rem-card">
+              <div class="rem-label">Endpoint Response</div>
+              <div class="rem-val ${end.prediction ? 'yes' : 'no'}">${end.prediction ? 'REQUIRED' : 'NOT NEEDED'}</div>
+              <div class="rem-prob">Probability: ${Math.round(end.probability * 100)}% (threshold ${Math.round(end.threshold * 100)}%)</div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    // Warnings section
+    let warnHtml = '';
+    if (r.warnings && r.warnings.length > 0) {
+      warnHtml = `
+        <div class="analysis-card">
+          <div class="ac-header"><span class="ac-title">Warnings</span></div>
+          <div class="warn-list">${r.warnings.map(w => `<div class="warn-item">⚠ ${w}</div>`).join('')}</div>
+        </div>`;
+    }
+
+    rc.innerHTML = `
+      <div class="verdict-card ${vk}">
+        <div class="verdict-header">
+          <div>
+            <div class="verdict-label ${vk}">${r.triage_label} · ${r.triage_full}</div>
+            <div class="verdict-title">${r.triage_full === 'True Positive' ? 'Threat Confirmed' : r.triage_full === 'False Positive' ? 'Alert Dismissed' : 'Benign Activity'}</div>
+            <div style="margin-top:8px;font-size:11px;color:var(--muted);font-family:var(--mono)">XGBoost triage model · class ${r.triage_class}</div>
+          </div>
+          <div>
+            <div class="conf-num ${vk}">${conf}%</div>
+            <div class="conf-label">Confidence</div>
+          </div>
+        </div>
+        <div class="prob-section">
+          <div class="prob-row">
+            <div class="prob-name">True Positive</div>
+            <div class="prob-bar-bg"><div class="prob-bar-fill" style="width:${tpPct}%;background:#ef4444"></div></div>
+            <div class="prob-val">${tpPct}%</div>
+          </div>
+          <div class="prob-row">
+            <div class="prob-name">Benign Positive</div>
+            <div class="prob-bar-bg"><div class="prob-bar-fill" style="width:${bpPct}%;background:#f59e0b"></div></div>
+            <div class="prob-val">${bpPct}%</div>
+          </div>
+          <div class="prob-row">
+            <div class="prob-name">False Positive</div>
+            <div class="prob-bar-bg"><div class="prob-bar-fill" style="width:${fpPct}%;background:#22c55e"></div></div>
+            <div class="prob-val">${fpPct}%</div>
+          </div>
+        </div>
+      </div>
+
+      ${remHtml}
+      ${warnHtml}
+
+      <div class="analysis-card">
+        <div class="ac-header"><span class="ac-title">Analyst Actions</span></div>
+        <div class="ac-body" style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px">
+          <button onclick="this.textContent='✓ Isolated'" style="padding:7px 14px;border-radius:5px;background:var(--surface2);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:12px;cursor:pointer">Isolate Host</button>
+          <button onclick="this.textContent='✓ Ticketed'" style="padding:7px 14px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;cursor:pointer">Create Ticket</button>
+          <button onclick="this.textContent='✓ Escalated'" style="padding:7px 14px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;cursor:pointer">Escalate to Tier 2</button>
+          <button onclick="this.textContent='✓ Closed'" style="padding:7px 14px;border-radius:5px;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:12px;cursor:pointer">Close Alert</button>
+        </div>
+      </div>`;
+
+    rc.scrollTop = 0;
+  }
+
+  function showError(msg) {
+    document.getElementById('empty-state').style.display = 'none';
+    const rc = document.getElementById('results-content');
+    rc.style.display = 'flex';
+    rc.innerHTML = `
+      <div style="padding:20px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.25);border-radius:8px">
+        <div style="font-size:11px;font-family:var(--mono);color:#f87171;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">API Error</div>
+        <div style="font-size:13px;font-family:var(--mono);color:#fca5a5">${msg}</div>
+        <div style="margin-top:12px;font-size:11px;color:var(--muted)">Make sure your FastAPI server is running:<br/><code style="color:#93c5fd">uvicorn app:app --reload</code></div>
+      </div>`;
+  }
+</script>
+
+
+</body>
+</html>
