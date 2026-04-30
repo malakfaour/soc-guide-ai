@@ -1,7 +1,11 @@
-﻿# TODO
+﻿# predict.py
+
 import pandas as pd
-from xgboost import XGBClassifier
 import numpy as np
+from xgboost import XGBClassifier
+from utils import load_test_data
+from remediation import suggest_action
+
 
 def load_model():
     model = XGBClassifier()
@@ -20,12 +24,19 @@ def predict(model, data):
 
 
 if __name__ == "__main__":
+    print("Loading model...")
     model = load_model()
 
-    # Example input (replace with real data)
-    sample = pd.read_csv("data/processed/v1/X_test.csv").iloc[:5]
+    print("Loading test data...")
+    X_test, y_test = load_test_data()
 
-    preds, probs = predict(model, sample)
+    print("Running predictions...")
+    preds, probs = predict(model, X_test)
 
-    print("Predictions:", preds)
-    print("Probabilities:\n", probs)
+    print("\nSample predictions with actions:")
+    for i in range(10):
+        action = suggest_action(preds[i])
+        print(f"Prediction: {preds[i]} | Action: {action}")
+
+    accuracy = (preds == y_test.values.ravel()).mean()
+    print(f"\nAccuracy on test set: {accuracy:.4f}")
