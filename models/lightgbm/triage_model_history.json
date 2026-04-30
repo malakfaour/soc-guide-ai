@@ -8,7 +8,7 @@
       "multi_logloss": 0.20887006322322232
     }
   },
-  "training_time_seconds": 27.576733,
+  "training_time_seconds": 20.288021,
   "num_features": 44,
   "params": {
     "objective": "multiclass",

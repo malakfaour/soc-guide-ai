@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from typing import Tuple, Dict, List
 from .train import LightGBMTriageModel
-
+from .plot import plot_confusion_matrix, plot_feature_importance
 
 class LightGBMPredictor:
     """
@@ -181,3 +181,20 @@ if __name__ == "__main__":
     print("\n" + "="*80)
     print("✅ ALL PREDICTOR TESTS PASSED")
     print("="*80)
+        # ========================
+    # 📊 FULL EVALUATION PLOTS
+    # ========================
+
+    print("\n📊 Generating full evaluation plots...")
+
+    # Predict on FULL validation set (not just sample)
+    full_result = predictor.predict(X_val)
+    y_pred = full_result['predictions']
+
+    # Confusion Matrix
+    plot_confusion_matrix(y_val, y_pred)
+
+    # Feature Importance
+    plot_feature_importance(predictor.model.model)
+
+    print("\n📊 Plots generated successfully!")
