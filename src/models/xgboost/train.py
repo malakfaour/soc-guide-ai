@@ -70,3 +70,42 @@ def predict_with_threshold(model, X, high_threshold=0.35):
     )
 
     return y_pred, proba
+
+if __name__ == "__main__":
+    import pandas as pd
+    from sklearn.metrics import confusion_matrix, classification_report
+
+    print("Loading data...")
+
+    X_train = pd.read_csv("data/processed/v1/X_train.csv")
+    y_train = pd.read_csv("data/processed/v1/y_train.csv")
+
+    X_val = pd.read_csv("data/processed/v1/X_val.csv")
+    y_val = pd.read_csv("data/processed/v1/y_val.csv")
+
+    print("Computing sample weights...")
+    sample_weights, class_weights = compute_sample_weights(y_train)
+
+    print("Training XGBoost model...")
+    model = train_xgboost_model(
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        sample_weights
+    )
+
+    print("Saving model...")
+    model.save_model("models/xgboost_model.json")
+
+    print("Evaluating model...")
+
+    y_pred = model.predict(X_val)
+
+    print("Confusion Matrix:")
+    print(confusion_matrix(y_val, y_pred))
+
+    print("Classification Report:")
+    print(classification_report(y_val, y_pred))
+
+    print("DONE")
