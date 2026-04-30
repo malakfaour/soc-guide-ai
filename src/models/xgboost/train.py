@@ -1,7 +1,11 @@
-﻿from xgboost import XGBClassifier
+﻿# train.py
+
+from xgboost import XGBClassifier
 import numpy as np
 from sklearn.utils.class_weight import compute_class_weight
-
+from sklearn.metrics import confusion_matrix, classification_report
+from .util import load_data
+from .plots import plot_confusion_matrix, plot_feature_importance
 
 def compute_sample_weights(y):
     y_array = y.values.ravel()
@@ -16,11 +20,10 @@ def compute_sample_weights(y):
     class_weight_dict = dict(zip(classes, class_weights))
     sample_weights = np.array([class_weight_dict[label] for label in y_array])
 
-    return sample_weights, class_weight_dict
+    return sample_weights
 
 
 def train_xgboost_model(X_train, y_train, X_val, y_val, sample_weights):
-    # Convert y to 1D
     y_train = y_train.values.ravel()
     y_val = y_val.values.ravel()
 
@@ -37,10 +40,6 @@ def train_xgboost_model(X_train, y_train, X_val, y_val, sample_weights):
         gamma=0.1,
         random_state=42,
         early_stopping_rounds=50,
-
-        # ✅ GPU settings (fixed)
-         # ✅ correct GPU usage
-       
         tree_method="hist",
         device="cuda"
     )
@@ -56,17 +55,41 @@ def train_xgboost_model(X_train, y_train, X_val, y_val, sample_weights):
     return model
 
 
-def predict_with_threshold(model, X, high_threshold=0.35):
-    if hasattr(X, "values"):
-        X = X.values
+if __name__ == "__main__":
+    print("Loading data...")
+    X_train, y_train, X_val, y_val = load_data()
 
-    proba = model.predict_proba(X)
+    print("Computing sample weights...")
+    sample_weights = compute_sample_weights(y_train)
 
-    # Apply threshold for class "High"
-    y_pred = np.where(
-        proba[:, 2] > high_threshold,
-        2,
-        np.argmax(proba, axis=1)
+    print("Training model...")
+    model = train_xgboost_model(
+        X_train,
+        y_train,
+        X_val,
+        y_val,
+        sample_weights
     )
 
-    return y_pred, proba
+    print("Saving model...")
+    model.save_model("models/xgboost_model.json")
+
+    print("Evaluating model...")
+    y_pred = model.predict(X_val)
+
+    print("Confusion Matrix:")
+    print(confusion_matrix(y_val, y_pred))
+
+    print("Classification Report:")
+    print(classification_report(y_val, y_pred))
+
+    print("DONE")
+
+    # ========================
+# 📊 PLOTS
+# ========================
+
+    class_names = ["FalsePositive", "BenignPositive", "TruePositive"]
+
+    plot_confusion_matrix(y_val, y_pred, class_names)
+    plot_feature_importance(model)
