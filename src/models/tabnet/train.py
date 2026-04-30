@@ -6,7 +6,7 @@ from src.training.train_tabnet import load_tabnet_data
 from src.models.tabnet.utils import (
     scale_tabnet_features,
     compute_tabnet_class_weights,
-    class_weights_to_sample_weights,   # per-sample weights for TabNet
+    class_weights_to_sample_weights,
     save_tabnet_model,
 )
 
@@ -47,49 +47,50 @@ def train():
     print(f"Using device: {device}")
 
     model = TabNetClassifier(
-    n_d=HYPERPARAMS["n_d"],
-    n_a=HYPERPARAMS["n_a"],
-    n_steps=HYPERPARAMS["n_steps"],
-    gamma=HYPERPARAMS["gamma"],
-    lambda_sparse=HYPERPARAMS["lambda_sparse"],
-    optimizer_fn=torch.optim.Adam,
-    optimizer_params=dict(lr=2e-3),   # 🔥 important
-    mask_type="entmax",               # 🔥 more stable than sparsemax
-    device_name=device,
-    verbose=1,
+        n_d=HYPERPARAMS["n_d"],
+        n_a=HYPERPARAMS["n_a"],
+        n_steps=HYPERPARAMS["n_steps"],
+        gamma=HYPERPARAMS["gamma"],
+        lambda_sparse=HYPERPARAMS["lambda_sparse"],
+        optimizer_fn=torch.optim.Adam,
+        optimizer_params=dict(lr=2e-3),
+        mask_type="entmax",
+        device_name=device,
+        verbose=1,
     )
 
     print("Training...")
-    try:
-        model.fit(
-            X_train=X_train,
-            y_train=y_train,
-            eval_set=[(X_val, y_val)],
-            eval_metric=["balanced_accuracy"],
-            max_epochs=HYPERPARAMS["max_epochs"],
-            patience=HYPERPARAMS["patience"],
-            batch_size=HYPERPARAMS["batch_size"],
-            virtual_batch_size=HYPERPARAMS["virtual_batch_size"],
-            weights=sample_weights,   # per-sample array, length == len(y_train)
-        )
-    except Exception as e:
-        print(f"Training failed: {e}")
-        raise
+    model.fit(
+        X_train=X_train,
+        y_train=y_train,
+        eval_set=[(X_val, y_val)],
+        eval_metric=["balanced_accuracy"],
+        max_epochs=HYPERPARAMS["max_epochs"],
+        patience=HYPERPARAMS["patience"],
+        batch_size=HYPERPARAMS["batch_size"],
+        virtual_batch_size=HYPERPARAMS["virtual_batch_size"],
+        weights=sample_weights,
+    )
+
+    # ✅ Print best results (FIXED POSITION)
+    print("\nBest epoch:", model.best_epoch)
+    print("Best validation score:", model.best_cost)
 
     # ── Evaluation ───────────────────────────────────────────────────────────
-    from sklearn.metrics import classification_report
+    from sklearn.metrics import classification_report, accuracy_score
+
     y_pred = model.predict(X_test)
+
     print("\n── Test set results ──")
+    print("Accuracy:", accuracy_score(y_test, y_pred))
     print(classification_report(y_test, y_pred))
 
     # ── Save ─────────────────────────────────────────────────────────────────
     print("Saving...")
     save_tabnet_model(model, scaler, class_weights, hyperparams=HYPERPARAMS)
+
     print("Done!")
 
 
 if __name__ == "__main__":
     train()
-
-print("Best epoch:", model.best_epoch)
-print("Best validation score:", model.best_cost)
