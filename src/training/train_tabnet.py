@@ -7,8 +7,15 @@ Loads processed v1 data and performs validation checks before model training.
 import pandas as pd
 import numpy as np
 import os
+import sys
 from pathlib import Path
 from typing import Tuple, Dict, Any
+
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 
 # Data paths
@@ -53,7 +60,7 @@ def load_tabnet_data() -> Tuple[
     for name, path in paths.items():
         if not os.path.exists(path):
             raise FileNotFoundError(f"Required data file not found: {path}")
-        print(f"  ✓ {name}: {path}")
+        print(f"  [OK] {name}: {path}")
     
     # Load data
     print("\n[LOAD] Loading data files...")
@@ -64,7 +71,7 @@ def load_tabnet_data() -> Tuple[
     y_val = pd.read_csv(paths['y_val']).iloc[:, 0]
     y_test = pd.read_csv(paths['y_test']).iloc[:, 0]
     
-    print("  ✓ Data loaded successfully")
+    print("  [OK] Data loaded successfully")
     
     # Validate and display shape information
     print("\n[VALIDATION] Shape Information:")
@@ -87,7 +94,7 @@ def load_tabnet_data() -> Tuple[
             f"Feature mismatch: X_train has {n_features_train} features "
             f"but X_test has {X_test.shape[1]}"
         )
-    print("  ✓ Feature count consistent across splits")
+    print("  [OK] Feature count consistent across splits")
     
     # Validate sample count consistency with labels
     if X_train.shape[0] != len(y_train):
@@ -105,7 +112,7 @@ def load_tabnet_data() -> Tuple[
             f"Sample count mismatch: X_test has {X_test.shape[0]} samples "
             f"but y_test has {len(y_test)}"
         )
-    print("  ✓ Sample count consistent between features and targets")
+    print("  [OK] Sample count consistent between features and targets")
     
     # Check for missing values
     print("\n[VALIDATION] Missing Values Check:")
@@ -127,7 +134,7 @@ def load_tabnet_data() -> Tuple[
                      missing_y_train + missing_y_val + missing_y_test)
     if total_missing > 0:
         raise ValueError(f"Missing values detected: total={total_missing}")
-    print("  ✓ No missing values detected")
+    print("  [OK] No missing values detected")
     
     # Verify all features are numeric
     print("\n[VALIDATION] Feature Type Check:")
@@ -163,7 +170,7 @@ def load_tabnet_data() -> Tuple[
     print(f"  X_val features: {X_val.shape[1]} (all numeric)")
     print(f"  X_test features: {X_test.shape[1]} (all numeric)")
     print(f"  Target variable types: {set(y_train.dtype for y_train in [y_train, y_val, y_test])}")
-    print("  ✓ All feature columns are numeric")
+    print("  [OK] All feature columns are numeric")
     
     # Display summary statistics
     print("\n[SUMMARY] Data Statistics:")
@@ -179,7 +186,7 @@ def load_tabnet_data() -> Tuple[
         print(f"    Class {class_label}: {count} samples ({pct:.1f}%)")
     
     print("\n" + "=" * 60)
-    print("✓ Data loading and validation successful!")
+    print("[OK] Data loading and validation successful!")
     print("=" * 60)
     
     # Convert to numpy arrays
@@ -225,9 +232,105 @@ def get_data_info() -> Dict[str, Any]:
 
 
 if __name__ == "__main__":
-    """Main execution - load and validate data"""
+    """Main execution - complete training pipeline"""
+    import json
+    from pathlib import Path
+    
+    # Add src/models/tabnet to path for imports
+    sys.path.insert(0, str(Path(__file__).parent.parent / "models" / "tabnet"))
+    sys.path.insert(0, str(Path(__file__).parent.parent / "evaluation"))
+    
     try:
+        # ===== STEP 1: LOAD AND VALIDATE DATA =====
+        print("\n" + "=" * 60)
+        print("TABNET TRAINING PIPELINE")
+        print("=" * 60)
+        
         X_train, X_val, X_test, y_train, y_val, y_test = load_tabnet_data()
+        
+        # ===== STEP 2: TRAIN TABNET MODEL =====
+        print("\n")
+        from train import train_tabnet_triage_model
+        
+        model, results = train_tabnet_triage_model(
+            X_train, X_val, X_test,
+            y_train, y_val, y_test,
+            verbose=True
+        )
+        
+        # ===== STEP 3: SAVE TRAINED MODEL =====
+        print("\n")
+        from utils import save_tabnet_model
+        
+        artifact_paths = save_tabnet_model(
+            model=model,
+            scaler=results['scaler'],
+            class_weights=results['class_weights'],
+            model_dir="models/tabnet",
+            model_name="triage_model",
+            verbose=True
+        )
+        
+        # ===== STEP 4: RUN EVALUATION AND SAVE METRICS =====
+        print("\n")
+        from metrics import TriageEvaluator
+        
+        # Extract predictions from results
+        y_pred_test = results['predictions']['test']
+        y_proba_test = results['probabilities']['test']
+        
+        # Compute metrics
+        evaluator = TriageEvaluator(n_classes=results['metrics']['n_classes'])
+        test_metrics = evaluator.compute_metrics(
+            y_true=y_test,
+            y_pred=y_pred_test,
+            y_proba=y_proba_test
+        )
+        
+        # Display formatted metrics
+        formatted_metrics = evaluator.format_results(test_metrics)
+        print(formatted_metrics)
+        
+        # Save metrics to file
+        metrics_dir = Path("reports/metrics")
+        metrics_dir.mkdir(parents=True, exist_ok=True)
+        
+        metrics_file = metrics_dir / "triage_metrics.json"
+        with open(metrics_file, 'w') as f:
+            json.dump(test_metrics, f, indent=2)
+        
+        print(f"\n[SAVE] Metrics saved: {metrics_file}")
+        
+        # ===== SUMMARY =====
+        print("\n" + "=" * 60)
+        print("[OK] TRAINING PIPELINE COMPLETE")
+        print("=" * 60)
+        print(f"\n[ARTIFACTS SAVED]")
+        print(f"  Model: {artifact_paths.get('model', 'models/tabnet/triage_model.zip')}")
+        print(f"  Scaler: {artifact_paths.get('scaler', 'models/tabnet/triage_model_scaler.pkl')}")
+        print(f"  Config: {artifact_paths.get('config', 'models/tabnet/triage_model_config.json')}")
+        print(f"  Metrics: {metrics_file}")
+        
+        print(f"\n[TRAINING RESULTS]")
+        print(f"  Training samples: {results['metrics']['train_samples']}")
+        print(f"  Validation samples: {results['metrics']['val_samples']}")
+        print(f"  Test samples: {results['metrics']['test_samples']}")
+        print(f"  Features: {results['metrics']['n_features']}")
+        print(f"  Classes: {results['metrics']['n_classes']}")
+        
+        print(f"\n[ACCURACIES]")
+        print(f"  Train: {results['accuracy']['train']:.4f}")
+        print(f"  Validation: {results['accuracy']['val']:.4f}")
+        print(f"  Test: {results['accuracy']['test']:.4f}")
+        
+        print(f"\n[TEST METRICS]")
+        print(f"  Macro-F1: {test_metrics['macro_f1']:.4f}")
+        print(f"  Overall Accuracy: {test_metrics['overall_accuracy']:.4f}")
+        
+        print("\n" + "=" * 60)
+        
     except Exception as e:
         print(f"\n[ERROR] {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise

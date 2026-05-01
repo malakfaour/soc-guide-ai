@@ -1,0 +1,20 @@
+{
+  "model_name": "triage_model",
+  "model_type": "TabNetClassifier",
+  "class_weights": {
+    "0": 1.5377191820149287,
+    "1": 0.7706977464913446,
+    "2": 0.9504251805140385
+  },
+  "n_classes": 3,
+  "classes": [
+    0,
+    1,
+    2
+  ],
+  "scaler_type": "QuantileTransformer",
+  "scaler_config": {
+    "n_quantiles": 1000,
+    "output_distribution": "normal"
+  }
+}

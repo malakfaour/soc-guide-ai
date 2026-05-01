@@ -1,0 +1,10 @@
+{
+  "generated_figures": {
+    "tabnet_confusion_matrix": "C:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\tabnet_confusion_matrix.png",
+    "lightgbm_confusion_matrix": "C:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\lightgbm_confusion_matrix.png",
+    "xgboost_confusion_matrix": "C:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\xgboost_confusion_matrix.png",
+    "triage_model_comparison": "C:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\triage_model_comparison.png",
+    "hybrid_pipeline_architecture": "C:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\hybrid_pipeline_architecture.png",
+    "tabnet_training_curve_note": "C:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\tabnet_training_curve_note.png"
+  }
+}
