@@ -9,7 +9,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { ModelSelector } from '../components/ModelSelector';
+import { AlertsOverTimeChart } from '../components/charts/AlertsOverTimeChart';
+import { ClassDistributionChart } from '../components/charts/ClassDistributionChart';
 import { useMetrics } from '../hooks/useMetrics';
+import { useModel } from '../context/ModelContext';
 import { InfoPill, PageHeader, PageShell, Panel, PanelHeader } from '../components/ui';
 
 const CLASS_LABELS = ['FalsePositive', 'BenignPositive', 'TruePositive'];
@@ -83,7 +87,8 @@ function DashboardTooltip({ active, payload, label }: any) {
 }
 
 export default function Dashboard() {
-  const { loading, error, data } = useMetrics();
+  const { model } = useModel();
+  const { loading, error, data } = useMetrics(model);
 
   const totalEvaluated = data ? sumMatrix(data.confusion_matrix) : 0;
   const correctPredictions = data ? diagonalSum(data.confusion_matrix) : 0;
@@ -102,7 +107,12 @@ export default function Dashboard() {
         eyebrow="SOC Overview"
         title="Model performance at a glance"
         subtitle="A clean analyst view of backend evaluation quality, coverage, and per-class stability for rapid decision-making."
-        actions={<InfoPill icon={BarChart3} label="Live source: /metrics" tone="info" />}
+        actions={
+          <>
+            <ModelSelector />
+            <InfoPill icon={BarChart3} label={`Live source: /metrics?model=${model}`} tone="info" />
+          </>
+        }
       />
 
       {loading && <LoadingSkeleton />}
@@ -128,6 +138,11 @@ export default function Dashboard() {
             <StatCard icon={Target} label="Macro F1" value={formatPercent(data.macro_f1)} color="#f59e0b" sub="backend" />
             <StatCard icon={Database} label="Evaluated Rows" value={totalEvaluated.toLocaleString()} color="#22c55e" sub="/metrics" />
             <StatCard icon={CheckCircle2} label="Correct Predictions" value={correctPredictions.toLocaleString()} color="#ef4444" sub="matrix diagonal" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            <ClassDistributionChart distribution={data.class_distribution} />
+            <AlertsOverTimeChart data={data.alerts_over_time} />
           </div>
 
           <Panel>

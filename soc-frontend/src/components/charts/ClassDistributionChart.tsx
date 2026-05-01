@@ -7,14 +7,14 @@ const CLASS_COLORS = {
 };
 
 interface ClassDistributionChartProps {
-  confusionMatrix: number[][];
+  distribution: Record<string, number>;
 }
 
-export function ClassDistributionChart({ confusionMatrix }: ClassDistributionChartProps) {
+export function ClassDistributionChart({ distribution }: ClassDistributionChartProps) {
   const labels = ['FalsePositive', 'BenignPositive', 'TruePositive'] as const;
   const data = labels.map((label, index) => ({
     name: label,
-    value: confusionMatrix[index]?.reduce((sum, item) => sum + item, 0) ?? 0,
+    value: distribution[label] ?? 0,
     color: CLASS_COLORS[label],
   }));
 

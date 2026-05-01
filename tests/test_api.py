@@ -15,15 +15,24 @@ def test_health_reports_model_statuses():
 
 def test_metrics_payload_shape():
     with TestClient(app) as client:
-        response = client.get("/metrics")
+        health_payload = client.get("/health").json()
+        for model in ("xgboost", "lightgbm", "tabnet"):
+            response = client.get(f"/metrics?model={model}")
+            is_loaded = health_payload["models"][model]["loaded"]
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert len(payload["confusion_matrix"]) == 3
-    assert all(len(row) == 3 for row in payload["confusion_matrix"])
-    assert 0 <= payload["accuracy"] <= 1
-    assert 0 <= payload["macro_f1"] <= 1
-    assert {"FalsePositive", "BenignPositive", "TruePositive"}.issubset(payload["per_class"])
+            if is_loaded:
+                assert response.status_code == 200
+                payload = response.json()
+                assert len(payload["confusion_matrix"]) == 3
+                assert all(len(row) == 3 for row in payload["confusion_matrix"])
+                assert 0 <= payload["accuracy"] <= 1
+                assert 0 <= payload["macro_f1"] <= 1
+                assert {"FalsePositive", "BenignPositive", "TruePositive"}.issubset(payload["per_class"])
+                assert {"FalsePositive", "BenignPositive", "TruePositive"}.issubset(payload["class_distribution"])
+                assert payload["confidence_distribution"]
+                assert payload["alerts_over_time"]
+            else:
+                assert response.status_code == 503
 
 
 def test_processed_sample_can_feed_loaded_models():
@@ -56,7 +65,7 @@ def test_processed_sample_can_feed_loaded_models():
 
 def test_evaluate_returns_saved_metrics_source():
     with TestClient(app) as client:
-        response = client.post("/evaluate")
+        response = client.post("/evaluate?model=xgboost")
 
     assert response.status_code == 200
     payload = response.json()

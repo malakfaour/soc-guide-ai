@@ -15,7 +15,7 @@ import json
 import csv
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncIterator, Dict, List, Literal, Optional
+from typing import Any, AsyncIterator, Dict, List, Literal, Optional, cast
 
 import joblib
 import numpy as np
@@ -77,6 +77,9 @@ class MetricsResponse(BaseModel):
     confusion_matrix: List[List[int]]
     accuracy: float
     macro_f1: float
+    class_distribution: Dict[str, int]
+    confidence_distribution: List[Dict[str, Any]]
+    alerts_over_time: List[Dict[str, Any]]
     per_class: Dict[str, MetricsClassStats]
 
 
@@ -101,8 +104,8 @@ class ModelRegistry:
         self.remediation_metadata: Dict[str, Any] = {}
         self.remediation_thresholds: Dict[str, float] = {}
         self.remediation_status = ModelStatus(loaded=False)
-        self.metrics_payload: Dict[str, Any] | None = None
-        self.metrics_source: str | None = None
+        self.metrics_payloads: Dict[str, Dict[str, Any]] = {}
+        self.metrics_sources: Dict[str, str] = {}
         self.status: Dict[str, ModelStatus] = {
             model_name: ModelStatus(loaded=False) for model_name in MODEL_NAMES
         }
@@ -112,7 +115,6 @@ class ModelRegistry:
         self._load_lightgbm()
         self._load_tabnet()
         self._load_remediation()
-        self._load_metrics()
 
     def _load_json(self, path: Path) -> Dict[str, Any]:
         with open(path, "r", encoding="utf-8") as handle:
@@ -172,45 +174,135 @@ class ModelRegistry:
         except Exception as exc:
             self.remediation_status = ModelStatus(loaded=False, error=f"{type(exc).__name__}: {exc}")
 
-    def _load_metrics(self) -> None:
-        metrics_candidates = [
-            PROJECT_ROOT / "reports" / "metrics" / "lightgbm_triage_metrics.json",
-            PROJECT_ROOT / "reports" / "metrics" / "xgboost_triage_metrics.json",
-            PROJECT_ROOT / "reports" / "metrics" / "triage_metrics.json",
+    def _metrics_path_for_model(self, model_name: str) -> Path:
+        metrics_dir = PROJECT_ROOT / "reports" / "metrics"
+        if model_name == "tabnet":
+            return metrics_dir / "triage_metrics.json"
+        return metrics_dir / f"{model_name}_triage_metrics.json"
+
+    def _load_test_features(self) -> np.ndarray:
+        feature_path = PROCESSED_DATA_ROOT / "X_test.csv"
+        with open(feature_path, "r", encoding="utf-8", newline="") as handle:
+            reader = csv.reader(handle)
+            next(reader, None)
+            rows = [[float(value) for value in row] for row in reader]
+        return np.asarray(rows, dtype=np.float32)
+
+    def _load_test_timestamps(self) -> List[str]:
+        feature_path = PROCESSED_DATA_ROOT / "X_test.csv"
+        raw_timestamps: List[float] = []
+        with open(feature_path, "r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for row in reader:
+                processed_timestamp = row.get("Timestamp")
+                if processed_timestamp is None:
+                    raise HTTPException(status_code=503, detail="Processed test features are missing the Timestamp column.")
+                raw_timestamps.append(float(processed_timestamp))
+
+        timestamp_array = np.asarray(raw_timestamps, dtype=np.float32)
+        if timestamp_array.size == 0:
+            return []
+
+        bucket_count = min(12, int(timestamp_array.size))
+        if bucket_count <= 1:
+            return ["Window 01"] * int(timestamp_array.size)
+
+        edges = np.linspace(float(timestamp_array.min()), float(timestamp_array.max()), bucket_count + 1)
+        bucket_indexes = np.digitize(timestamp_array, edges[1:-1], right=False)
+        return [f"Window {index + 1:02d}" for index in bucket_indexes.tolist()]
+
+    def _predict_probabilities_for_metrics(self, model_name: str, features: np.ndarray) -> np.ndarray:
+        model_status = self.status.get(model_name)
+        if model_status is None or not model_status.loaded:
+            message = "Model is unavailable." if model_status is None else (model_status.error or "Model is unavailable.")
+            raise HTTPException(status_code=503, detail=f"Metrics unavailable because model '{model_name}' is not loaded: {message}")
+
+        model = self.models[model_name]
+        if model_name == "tabnet":
+            scaled = self.tabnet_scaler.transform(features, split_name="Metrics")
+            probabilities = model.predict_proba(scaled)
+        else:
+            probabilities = model.predict_proba(features)
+        return np.asarray(probabilities, dtype=np.float32)
+
+    def _build_confidence_distribution(self, probabilities: np.ndarray) -> List[Dict[str, Any]]:
+        confidences = np.max(probabilities, axis=1)
+        bins = np.linspace(0.0, 1.0, 11)
+        counts, edges = np.histogram(confidences, bins=bins)
+        distribution: List[Dict[str, Any]] = []
+        for index, count in enumerate(counts):
+            start = int(round(edges[index] * 100))
+            end = int(round(edges[index + 1] * 100))
+            distribution.append({
+                "bucket": f"{start}-{end}%",
+                "count": int(count),
+            })
+        return distribution
+
+    def _build_alerts_over_time(self, probabilities: np.ndarray, timestamps: List[str]) -> List[Dict[str, Any]]:
+        predictions = np.argmax(probabilities, axis=1)
+        if len(predictions) != len(timestamps):
+            raise HTTPException(
+                status_code=503,
+                detail="Metrics artifact mismatch: processed test rows do not align with processed timestamp buckets.",
+            )
+
+        labels = ("FalsePositive", "BenignPositive", "TruePositive")
+        grouped: Dict[str, Dict[str, int]] = {}
+        for date_key, prediction in zip(timestamps, predictions):
+            bucket = grouped.setdefault(date_key, {label: 0 for label in labels})
+            bucket[labels[int(prediction)]] += 1
+
+        return [
+            {"date": date_key, **grouped[date_key]}
+            for date_key in sorted(grouped.keys())
         ]
 
-        for metrics_path in metrics_candidates:
-            if not metrics_path.exists():
-                continue
+    def _build_metrics_payload(self, model_name: str) -> Dict[str, Any]:
+        metrics_path = self._metrics_path_for_model(model_name)
+        if not metrics_path.exists():
+            raise HTTPException(status_code=404, detail=f"Metrics file not found for model '{model_name}'.")
 
-            raw_metrics = self._load_json(metrics_path)
-            self.metrics_payload = {
-                "confusion_matrix": raw_metrics["confusion_matrix"],
-                "accuracy": raw_metrics.get("overall_accuracy", raw_metrics.get("accuracy")),
-                "macro_f1": raw_metrics["macro_f1"],
-                "per_class": {
-                    "FalsePositive": {
-                        "precision": raw_metrics["per_class_metrics"]["Class_0"]["precision"],
-                        "recall": raw_metrics["per_class_metrics"]["Class_0"]["recall"],
-                        "f1": raw_metrics["per_class_metrics"]["Class_0"]["f1"],
-                        "support": raw_metrics["per_class_metrics"]["Class_0"]["support"],
-                    },
-                    "BenignPositive": {
-                        "precision": raw_metrics["per_class_metrics"]["Class_1"]["precision"],
-                        "recall": raw_metrics["per_class_metrics"]["Class_1"]["recall"],
-                        "f1": raw_metrics["per_class_metrics"]["Class_1"]["f1"],
-                        "support": raw_metrics["per_class_metrics"]["Class_1"]["support"],
-                    },
-                    "TruePositive": {
-                        "precision": raw_metrics["per_class_metrics"]["Class_2"]["precision"],
-                        "recall": raw_metrics["per_class_metrics"]["Class_2"]["recall"],
-                        "f1": raw_metrics["per_class_metrics"]["Class_2"]["f1"],
-                        "support": raw_metrics["per_class_metrics"]["Class_2"]["support"],
-                    },
-                },
-            }
-            self.metrics_source = str(metrics_path.relative_to(PROJECT_ROOT))
-            return
+        raw_metrics = self._load_json(metrics_path)
+        per_class = {
+            "FalsePositive": {
+                "precision": raw_metrics["per_class_metrics"]["Class_0"]["precision"],
+                "recall": raw_metrics["per_class_metrics"]["Class_0"]["recall"],
+                "f1": raw_metrics["per_class_metrics"]["Class_0"]["f1"],
+                "support": raw_metrics["per_class_metrics"]["Class_0"]["support"],
+            },
+            "BenignPositive": {
+                "precision": raw_metrics["per_class_metrics"]["Class_1"]["precision"],
+                "recall": raw_metrics["per_class_metrics"]["Class_1"]["recall"],
+                "f1": raw_metrics["per_class_metrics"]["Class_1"]["f1"],
+                "support": raw_metrics["per_class_metrics"]["Class_1"]["support"],
+            },
+            "TruePositive": {
+                "precision": raw_metrics["per_class_metrics"]["Class_2"]["precision"],
+                "recall": raw_metrics["per_class_metrics"]["Class_2"]["recall"],
+                "f1": raw_metrics["per_class_metrics"]["Class_2"]["f1"],
+                "support": raw_metrics["per_class_metrics"]["Class_2"]["support"],
+            },
+        }
+
+        test_features = self._load_test_features()
+        timestamps = self._load_test_timestamps()
+        probabilities = self._predict_probabilities_for_metrics(model_name, test_features)
+
+        payload = {
+            "confusion_matrix": raw_metrics["confusion_matrix"],
+            "accuracy": raw_metrics.get("overall_accuracy", raw_metrics.get("accuracy")),
+            "macro_f1": raw_metrics["macro_f1"],
+            "class_distribution": {
+                label: int(stats["support"])
+                for label, stats in per_class.items()
+            },
+            "confidence_distribution": self._build_confidence_distribution(probabilities),
+            "alerts_over_time": self._build_alerts_over_time(probabilities, timestamps),
+            "per_class": per_class,
+        }
+        self.metrics_sources[model_name] = str(metrics_path.relative_to(PROJECT_ROOT))
+        return payload
 
     def health_payload(self) -> Dict[str, Any]:
         online = any(status.loaded for status in self.status.values())
@@ -329,18 +421,18 @@ class ModelRegistry:
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"Remediation prediction failed: {exc}") from exc
 
-    def metrics(self) -> MetricsResponse:
-        if self.metrics_payload is None:
-            raise HTTPException(status_code=503, detail="Metrics are not available.")
-        return MetricsResponse(**self.metrics_payload)
+    def metrics(self, model_name: Literal["xgboost", "lightgbm", "tabnet"]) -> MetricsResponse:
+        if model_name not in self.metrics_payloads:
+            self.metrics_payloads[model_name] = self._build_metrics_payload(model_name)
+        return MetricsResponse(**self.metrics_payloads[model_name])
 
-    def evaluate(self) -> EvaluationResponse:
-        metrics = self.metrics()
+    def evaluate(self, model_name: Literal["xgboost", "lightgbm", "tabnet"]) -> EvaluationResponse:
+        metrics = self.metrics(model_name)
         payload = metrics.model_dump() if hasattr(metrics, "model_dump") else metrics.dict()
         return EvaluationResponse(
             **payload,
-            source=self.metrics_source or "reports/metrics",
-            message="Loaded saved evaluation metrics generated by the training pipeline.",
+            source=self.metrics_sources.get(model_name, "reports/metrics"),
+            message=f"Loaded saved evaluation metrics and derived backend chart series for '{model_name}'.",
         )
 
     def sample_features(self, split: Literal["train", "val", "test"], row: int) -> FeatureSampleResponse:
@@ -443,13 +535,17 @@ async def remediation_predict(request: RemediationRequest) -> RemediationRespons
 
 
 @app.get("/metrics", response_model=MetricsResponse)
-async def metrics() -> MetricsResponse:
-    return registry.metrics()
+async def metrics(
+    model: Literal["xgboost", "lightgbm", "tabnet"] = "xgboost",
+) -> MetricsResponse:
+    return registry.metrics(cast(Literal["xgboost", "lightgbm", "tabnet"], model))
 
 
 @app.post("/evaluate", response_model=EvaluationResponse)
-async def evaluate() -> EvaluationResponse:
-    return registry.evaluate()
+async def evaluate(
+    model: Literal["xgboost", "lightgbm", "tabnet"] = "xgboost",
+) -> EvaluationResponse:
+    return registry.evaluate(cast(Literal["xgboost", "lightgbm", "tabnet"], model))
 
 
 @app.get("/sample-features", response_model=FeatureSampleResponse)
