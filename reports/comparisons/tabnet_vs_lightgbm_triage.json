@@ -1,0 +1,11 @@
+{
+  "lightgbm": {
+    "macro_f1": 0.9132110177889553,
+    "overall_accuracy": 0.9186436134566413
+  },
+  "tabnet": {
+    "macro_f1": 0.7833859002721623,
+    "overall_accuracy": 0.7903766251172765
+  },
+  "winner_by_macro_f1": "lightgbm"
+}

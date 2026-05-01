@@ -12,6 +12,11 @@ from sklearn.preprocessing import QuantileTransformer
 from sklearn.utils.class_weight import compute_class_weight
 from typing import Tuple, Optional, Dict, Any
 
+try:
+    from pytorch_tabnet.tab_model import TabNetClassifier
+except Exception:
+    TabNetClassifier = None
+
 
 class TabNetScaler:
     """
@@ -312,45 +317,6 @@ def compute_tabnet_class_weights(
     return class_weights_dict
 
 
-if __name__ == "__main__":
-    """Test scaling and class weights functionality"""
-    import sys
-    sys.path.insert(0, 'src/training')
-    from train_tabnet import load_tabnet_data
-    
-    try:
-        # Load data
-        X_train, X_val, X_test, y_train, y_val, y_test = load_tabnet_data()
-        
-        print("\n")
-        
-        # Scale features (targets not scaled)
-        X_train_scaled, X_val_scaled, X_test_scaled, scaler = scale_tabnet_features(
-            X_train, X_val, X_test, verbose=True
-        )
-        
-        # Verify targets are unchanged
-        print("\n[VERIFICATION] Targets unchanged:")
-        print(f"  y_train shape: {y_train.shape} (original)")
-        print(f"  y_val shape:   {y_val.shape} (original)")
-        print(f"  y_test shape:  {y_test.shape} (original)")
-        print(f"  y_train dtype: {y_train.dtype}")
-        
-        print("\n")
-        
-        # Compute class weights for imbalance handling
-        class_weights = compute_tabnet_class_weights(y_train, verbose=True)
-        
-        print("\n[READY] All preprocessing components prepared:")
-        print(f"  ✓ Features scaled: {X_train_scaled.shape}")
-        print(f"  ✓ Class weights computed: {len(class_weights)} classes")
-        print("  ✓ Ready for TabNet model training!")
-        
-    except Exception as e:
-        print(f"\n[ERROR] {str(e)}")
-        raise
-
-
 def save_tabnet_model(
     model: Any,
     scaler: TabNetScaler,
@@ -415,14 +381,12 @@ def save_tabnet_model(
         print(f"\n[SAVE] Model directory: {model_dir}")
     
     # Save model
-    model_path = os.path.join(model_dir, f"{model_name}.pkl")
+    model_base_path = os.path.join(model_dir, model_name)
+    model_path = f"{model_base_path}.zip"
     try:
-        # TabNetClassifier has a save_model method, use it if available
-        if hasattr(model, 'save_model'):
-            model.save_model(model_path)
-        else:
-            # Fall back to joblib
-            joblib.dump(model, model_path)
+        if not hasattr(model, 'save_model'):
+            raise ValueError("Model does not support TabNet save_model()")
+        model.save_model(model_base_path)
         if verbose:
             print(f"  ✓ Model saved: {model_path}")
     except Exception as e:
@@ -523,7 +487,7 @@ def load_tabnet_model(
         print("Loading TabNet Model")
         print("=" * 60)
     
-    model_path = os.path.join(model_dir, f"{model_name}.pkl")
+    model_path = os.path.join(model_dir, f"{model_name}.zip")
     scaler_path = os.path.join(model_dir, f"{model_name}_scaler.pkl")
     config_path = os.path.join(model_dir, f"{model_name}_config.json")
     
@@ -567,7 +531,12 @@ def load_tabnet_model(
         print(f"\n[LOAD] Loading model...")
     
     try:
-        model = joblib.load(model_path)
+        if TabNetClassifier is None:
+            raise ImportError(
+                "pytorch_tabnet is required to load a saved TabNetClassifier"
+            )
+        model = TabNetClassifier()
+        model.load_model(model_path)
         if verbose:
             print(f"  ✓ Model loaded: {config['model_type']}")
     except Exception as e:
@@ -587,4 +556,42 @@ def load_tabnet_model(
         print("=" * 60)
     
     return model, scaler, {**config, 'class_weights': class_weights}
+
+if __name__ == "__main__":
+    """Test scaling and class weights functionality"""
+    import sys
+    sys.path.insert(0, 'src/training')
+    from train_tabnet import load_tabnet_data
+    
+    try:
+        # Load data
+        X_train, X_val, X_test, y_train, y_val, y_test = load_tabnet_data()
+        
+        print("\n")
+        
+        # Scale features (targets not scaled)
+        X_train_scaled, X_val_scaled, X_test_scaled, scaler = scale_tabnet_features(
+            X_train, X_val, X_test, verbose=True
+        )
+        
+        # Verify targets are unchanged
+        print("\n[VERIFICATION] Targets unchanged:")
+        print(f"  y_train shape: {y_train.shape} (original)")
+        print(f"  y_val shape:   {y_val.shape} (original)")
+        print(f"  y_test shape:  {y_test.shape} (original)")
+        print(f"  y_train dtype: {y_train.dtype}")
+        
+        print("\n")
+        
+        # Compute class weights for imbalance handling
+        class_weights = compute_tabnet_class_weights(y_train, verbose=True)
+        
+        print("\n[READY] All preprocessing components prepared:")
+        print(f"  ✓ Features scaled: {X_train_scaled.shape}")
+        print(f"  ✓ Class weights computed: {len(class_weights)} classes")
+        print("  ✓ Ready for TabNet model training!")
+        
+    except Exception as e:
+        print(f"\n[ERROR] {str(e)}")
+        raise
 

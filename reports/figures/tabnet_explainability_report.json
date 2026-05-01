@@ -1,0 +1,51 @@
+{
+  "plots": {
+    "feature_importance": "c:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\feature_importance.png",
+    "step_importance": "c:\\Users\\malty\\Projects\\SOC Intelligence\\reports\\figures\\step_importance.png"
+  },
+  "top_features": [
+    [
+      "IncidentId",
+      0.2109202061096827
+    ],
+    [
+      "Url",
+      0.17725467006365458
+    ],
+    [
+      "AlertTitle",
+      0.1440212446451187
+    ],
+    [
+      "AlertId",
+      0.09007711112499237
+    ],
+    [
+      "DeviceId",
+      0.04637448708216349
+    ],
+    [
+      "EntityType",
+      0.03705263912677765
+    ],
+    [
+      "SuspicionLevel",
+      0.033729957540829976
+    ],
+    [
+      "DeviceName",
+      0.03327144900957743
+    ],
+    [
+      "RegistryValueData",
+      0.03191821654637655
+    ],
+    [
+      "OSFamily",
+      0.029682210286458333
+    ]
+  ],
+  "n_samples": 50,
+  "n_features": 44,
+  "n_steps": 3
+}

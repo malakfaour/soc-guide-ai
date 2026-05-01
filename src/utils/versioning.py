@@ -149,8 +149,22 @@ def create_version(version=None, base_path=PROCESSED_DATA_ROOT, verbose=True):
     return version
 
 
-def save_dataset_with_version(X_train, X_val, X_test, y_train, y_val, y_test, 
-                              version=None, force=False, base_path=PROCESSED_DATA_ROOT, verbose=True):
+def save_dataset_with_version(
+    X_train,
+    X_val,
+    X_test,
+    y_train,
+    y_val,
+    y_test,
+    y_rem_train=None,
+    y_rem_val=None,
+    y_rem_test=None,
+    remediation_metadata=None,
+    version=None,
+    force=False,
+    base_path=PROCESSED_DATA_ROOT,
+    verbose=True,
+):
     """
     Save dataset with automatic versioning.
     
@@ -208,6 +222,15 @@ def save_dataset_with_version(X_train, X_val, X_test, y_train, y_val, y_test,
         ('y_val', y_val),
         ('y_test', y_test)
     ]
+
+    optional_files = [
+        ('y_rem_train', y_rem_train),
+        ('y_rem_val', y_rem_val),
+        ('y_rem_test', y_rem_test),
+    ]
+    for filename, data in optional_files:
+        if data is not None:
+            files_to_save.append((filename, data))
     
     for filename, data in files_to_save:
         filepath = os.path.join(version_path, f"{filename}.csv")
@@ -216,6 +239,15 @@ def save_dataset_with_version(X_train, X_val, X_test, y_train, y_val, y_test,
         if verbose:
             size_mb = os.path.getsize(filepath) / (1024 * 1024)
             print(f"  [OK] {filename}.csv ({size_mb:.1f} MB)")
+
+    if remediation_metadata is not None:
+        import json
+        metadata_path = os.path.join(version_path, "remediation_targets_metadata.json")
+        with open(metadata_path, 'w') as f:
+            json.dump(remediation_metadata, f, indent=2)
+        if verbose:
+            size_mb = os.path.getsize(metadata_path) / (1024 * 1024)
+            print(f"  [OK] remediation_targets_metadata.json ({size_mb:.1f} MB)")
     
     if verbose:
         print(f"\n[VERSION] Dataset version {version} created successfully")
@@ -255,7 +287,12 @@ def list_versions(base_path=PROCESSED_DATA_ROOT, verbose=True):
     return versions
 
 
-def load_dataset_by_version(version=None, base_path=PROCESSED_DATA_ROOT, verbose=True):
+def load_dataset_by_version(
+    version=None,
+    base_path=PROCESSED_DATA_ROOT,
+    verbose=True,
+    include_remediation=False,
+):
     """
     Load a specific dataset version.
     
@@ -266,6 +303,9 @@ def load_dataset_by_version(version=None, base_path=PROCESSED_DATA_ROOT, verbose
     
     Returns:
         Tuple of (X_train, X_val, X_test, y_train, y_val, y_test)
+        When include_remediation=True and remediation files exist:
+        Tuple of (X_train, X_val, X_test, y_train, y_val, y_test,
+                  y_rem_train, y_rem_val, y_rem_test, remediation_metadata)
     
     Raises:
         FileNotFoundError: If version not found
@@ -294,6 +334,29 @@ def load_dataset_by_version(version=None, base_path=PROCESSED_DATA_ROOT, verbose
     y_train = pd.read_csv(os.path.join(version_path, 'y_train.csv')).squeeze()
     y_val = pd.read_csv(os.path.join(version_path, 'y_val.csv')).squeeze()
     y_test = pd.read_csv(os.path.join(version_path, 'y_test.csv')).squeeze()
+
+    if include_remediation:
+        remediation_paths = {
+            'y_rem_train': os.path.join(version_path, 'y_rem_train.csv'),
+            'y_rem_val': os.path.join(version_path, 'y_rem_val.csv'),
+            'y_rem_test': os.path.join(version_path, 'y_rem_test.csv'),
+            'metadata': os.path.join(version_path, 'remediation_targets_metadata.json'),
+        }
+        missing = [
+            name for name, path in remediation_paths.items()
+            if not os.path.exists(path)
+        ]
+        if missing:
+            raise FileNotFoundError(
+                f"Remediation artifacts missing for {version}: {missing}"
+            )
+
+        y_rem_train = pd.read_csv(remediation_paths['y_rem_train'])
+        y_rem_val = pd.read_csv(remediation_paths['y_rem_val'])
+        y_rem_test = pd.read_csv(remediation_paths['y_rem_test'])
+        import json
+        with open(remediation_paths['metadata'], 'r') as f:
+            remediation_metadata = json.load(f)
     
     if verbose:
         print(f"  X_train: {X_train.shape}")
@@ -302,8 +365,18 @@ def load_dataset_by_version(version=None, base_path=PROCESSED_DATA_ROOT, verbose
         print(f"  y_train: {y_train.shape}")
         print(f"  y_val:   {y_val.shape}")
         print(f"  y_test:  {y_test.shape}")
+        if include_remediation:
+            print(f"  y_rem_train: {y_rem_train.shape}")
+            print(f"  y_rem_val:   {y_rem_val.shape}")
+            print(f"  y_rem_test:  {y_rem_test.shape}")
         print(f"\n[VERSION] Dataset version {version} loaded successfully")
-    
+
+    if include_remediation:
+        return (
+            X_train, X_val, X_test, y_train, y_val, y_test,
+            y_rem_train, y_rem_val, y_rem_test, remediation_metadata
+        )
+
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 

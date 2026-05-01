@@ -6,6 +6,8 @@ using model.explain(X) output and attention masks across decision steps.
 """
 
 import numpy as np
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Dict, Tuple, List, Any, Optional
@@ -55,9 +57,20 @@ class TabNetExplainer:
             feature_masks: Attention masks (n_samples, n_steps, n_features)
             predictions: Model predictions
         """
-        # TabNet explain returns (masks, predictions)
-        feature_masks, predictions = self.model.explain(X)
-        
+        explain_output, aux_output = self.model.explain(X)
+
+        # Current pytorch-tabnet returns:
+        #   explain_output -> aggregated explanation (n_samples, n_features)
+        #   aux_output -> dict of decision-step masks
+        if isinstance(aux_output, dict):
+            ordered_masks = [aux_output[key] for key in sorted(aux_output.keys())]
+            feature_masks = np.stack(ordered_masks, axis=1)
+            predictions = np.asarray(explain_output)
+            return feature_masks, predictions
+
+        # Fallback for older assumptions.
+        feature_masks = np.asarray(explain_output)
+        predictions = np.asarray(aux_output)
         return feature_masks, predictions
     
     def aggregate_feature_importance(

@@ -1,0 +1,70 @@
+{
+  "feature_columns": [
+    "alert_count",
+    "machine_entity_count",
+    "machine_entity_ratio",
+    "device_context_count",
+    "device_context_ratio",
+    "vm_resource_count",
+    "dominant_category_code",
+    "max_suspicion_score",
+    "max_verdict_score",
+    "max_severity_score",
+    "unique_entity_types",
+    "has_process_entity",
+    "has_file_entity",
+    "has_machine_entity"
+  ],
+  "target_columns": [
+    "account_response",
+    "endpoint_response"
+  ],
+  "dominant_category_mapping": {
+    "InitialAccess": 1,
+    "Exfiltration": 2,
+    "SuspiciousActivity": 3,
+    "CommandAndControl": 4,
+    "Execution": 5,
+    "Impact": 6,
+    "CredentialAccess": 7,
+    "Malware": 8,
+    "Discovery": 9,
+    "Persistence": 10,
+    "LateralMovement": 11,
+    "DefenseEvasion": 12,
+    "UnwantedSoftware": 13,
+    "Ransomware": 14,
+    "Collection": 15,
+    "PrivilegeEscalation": 16,
+    "Exploit": 17,
+    "CredentialStealing": 18,
+    "unknown": 0
+  },
+  "train_shape": [
+    34988,
+    14
+  ],
+  "val_shape": [
+    7497,
+    14
+  ],
+  "test_shape": [
+    7498,
+    14
+  ],
+  "train_target_counts": {
+    "account_response": 1166,
+    "endpoint_response": 89
+  },
+  "val_target_counts": {
+    "account_response": 250,
+    "endpoint_response": 19
+  },
+  "test_target_counts": {
+    "account_response": 250,
+    "endpoint_response": 19
+  },
+  "source_incident_count": 49983,
+  "random_state": 42,
+  "split_note": "Incident-level 70/15/15 split with stratification on remediation labels"
+}

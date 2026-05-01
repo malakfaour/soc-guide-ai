@@ -3,4 +3,15 @@ pandas
 numpy
 lightgbm
 scikit-learn
+<<<<<<< HEAD
 joblib
+=======
+lightgbm
+xgboost
+matplotlib
+seaborn
+jupyter
+catboost
+torch
+shap
+>>>>>>> origin/main

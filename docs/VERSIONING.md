@@ -17,6 +17,16 @@ All team members must use the **exact same dataset version** to ensure reproduci
 - `y_train.csv` (69,631 labels)
 - `y_val.csv` (14,922 labels)
 - `y_test.csv` (14,922 labels)
+- `y_rem_train.csv` (69,631 × 9 remediation labels)
+- `y_rem_val.csv` (14,922 × 9 remediation labels)
+- `y_rem_test.csv` (14,922 × 9 remediation labels)
+- `y_rem_family_train.csv` (69,631 × 2 remediation family labels)
+- `y_rem_family_val.csv` (14,922 × 2 remediation family labels)
+- `y_rem_family_test.csv` (14,922 × 2 remediation family labels)
+- `y_rem_incident_family_train.csv` (69,631 × 2 incident-level remediation family labels)
+- `y_rem_incident_family_val.csv` (14,922 × 2 incident-level remediation family labels)
+- `y_rem_incident_family_test.csv` (14,922 × 2 incident-level remediation family labels)
+- `remediation_targets_metadata.json` (label definitions and counts)
 
 **Dataset Statistics**:
 - Total Samples: 99,475
@@ -34,6 +44,9 @@ from src.utils.versioning import load_dataset_by_version
 
 # Load current version
 X_train, X_val, X_test, y_train, y_val, y_test = load_dataset_by_version('v1', verbose=True)
+
+# Load triage and remediation targets together
+dataset = load_dataset_by_version('v1', verbose=True, include_remediation=True)
 ```
 
 **Option 2: Direct Loading**
@@ -47,6 +60,38 @@ X_test = pd.read_csv('data/processed/v1/X_test.csv')
 y_train = pd.read_csv('data/processed/v1/y_train.csv').squeeze()
 y_val = pd.read_csv('data/processed/v1/y_val.csv').squeeze()
 y_test = pd.read_csv('data/processed/v1/y_test.csv').squeeze()
+
+y_rem_train = pd.read_csv('data/processed/v1/y_rem_train.csv')
+y_rem_val = pd.read_csv('data/processed/v1/y_rem_val.csv')
+y_rem_test = pd.read_csv('data/processed/v1/y_rem_test.csv')
+
+y_rem_family_train = pd.read_csv('data/processed/v1/y_rem_family_train.csv')
+y_rem_family_val = pd.read_csv('data/processed/v1/y_rem_family_val.csv')
+y_rem_family_test = pd.read_csv('data/processed/v1/y_rem_family_test.csv')
+
+y_rem_incident_family_train = pd.read_csv('data/processed/v1/y_rem_incident_family_train.csv')
+y_rem_incident_family_val = pd.read_csv('data/processed/v1/y_rem_incident_family_val.csv')
+y_rem_incident_family_test = pd.read_csv('data/processed/v1/y_rem_incident_family_test.csv')
+```
+
+### Recommended Multi-Task Validation
+
+Use the incident-level family target scheme with focal loss as the default validation path:
+
+```powershell
+python src\training\validate_tabnet_multitask.py --target-scheme incident_family --remediation-loss-type focal
+```
+
+Processed-data-only validation:
+
+```powershell
+python src\training\validate_tabnet_multitask.py --skip-train
+```
+
+Recommended training run:
+
+```powershell
+python src\training\train_tabnet_multitask.py --max-epochs 8 --patience 3 --batch-size 2048 --target-scheme incident_family --remediation-loss-type focal
 ```
 
 ### Checking Available Versions
@@ -161,7 +206,17 @@ data/
 │       ├── X_test.csv
 │       ├── y_train.csv
 │       ├── y_val.csv
-│       └── y_test.csv
+│       ├── y_test.csv
+│       ├── y_rem_train.csv
+│       ├── y_rem_val.csv
+│       ├── y_rem_test.csv
+│       ├── y_rem_family_train.csv
+│       ├── y_rem_family_val.csv
+│       ├── y_rem_family_test.csv
+│       ├── y_rem_incident_family_train.csv
+│       ├── y_rem_incident_family_val.csv
+│       ├── y_rem_incident_family_test.csv
+│       └── remediation_targets_metadata.json
 │   
 │   └── v2/               # Version 2 (FUTURE - if created)
 │       ├── X_train.csv
@@ -180,6 +235,13 @@ from src.utils.versioning import load_dataset_by_version
 X_train, X_val, X_test, y_train, y_val, y_test = load_dataset_by_version(
     version='v1',           # Load v1
     verbose=True            # Print details
+)
+
+# Load triage and remediation targets together
+dataset = load_dataset_by_version(
+    version='v1',
+    verbose=True,
+    include_remediation=True
 )
 
 # Load current version (auto-detect)
@@ -331,7 +393,7 @@ for name, model in models.items():
 
 | Version | Created | Samples | Features | Split  | Notes |
 |---------|---------|---------|----------|--------|-------|
-| v1      | 2024    | 99,475  | 44       | 70/15/15 | Current - Frequency encoded, stratified split |
+| v1      | 2024    | 99,475  | 44       | 70/15/15 | Current - Frequency encoded, stratified split, remediation labels exported |
 
 ---
 
