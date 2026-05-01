@@ -1,24 +1,16 @@
-streamlit
 pandas
 numpy
-lightgbm
 scikit-learn
-<<<<<<< HEAD
 joblib
-=======
-lightgbm
-xgboost
-matplotlib
-seaborn
-jupyter
-catboost
-torch
-shap
-<<<<<<< HEAD
 fastapi
 uvicorn[standard]
 pydantic
-joblib
-=======
->>>>>>> origin/main
->>>>>>> feature/lightgbm
+lightgbm
+xgboost
+torch
+pytorch-tabnet
+matplotlib
+seaborn
+shap
+pytest
+httpx

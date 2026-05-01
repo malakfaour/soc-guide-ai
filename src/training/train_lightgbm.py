@@ -1,82 +1,63 @@
 """
-LightGBM Training Entry Point
-Main script for training LightGBM triage model
+LightGBM training entry point.
 """
 
-import sys
+import json
 import os
+import sys
+
+import pandas as pd
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from models.lightgbm.train import train_triage_model
-from models.lightgbm.predict import LightGBMPredictor
-
-from evaluation.metrics import TriageEvaluator  # ✅ FIXED
-import json
-import pandas as pd
+from evaluation.metrics import TriageEvaluator
+from models.lightgbm.predict import load_model, predict
+from models.lightgbm.train import train_lightgbm_triage_model
 
 
 def train_and_evaluate():
-    print("="*80)
+    print("=" * 80)
     print("LIGHTGBM TRIAGE MODEL - TRAINING PIPELINE")
-    print("="*80)
-    
-    # STEP 1: Train model
-    print("\nSTEP 1: TRAINING MODEL")
-    model = train_triage_model(
-        data_dir='data/processed/v1',
-        save_dir='models/lightgbm',
-        use_class_weights=True
-    )
-    
-    # STEP 2: Load data
-    print("\nSTEP 2: LOADING DATA")
-    X_train = pd.read_csv('data/processed/v1/X_train.csv')
-    X_val = pd.read_csv('data/processed/v1/X_val.csv')
-    X_test = pd.read_csv('data/processed/v1/X_test.csv')
+    print("=" * 80)
 
-    y_train = pd.read_csv('data/processed/v1/y_train.csv').iloc[:, 0]
-    y_val = pd.read_csv('data/processed/v1/y_val.csv').iloc[:, 0]
-    y_test = pd.read_csv('data/processed/v1/y_test.csv').iloc[:, 0]
-    
-    # STEP 3: Validation Evaluation
+    print("\nSTEP 1: TRAINING MODEL")
+    model, train_metrics = train_lightgbm_triage_model(
+        version="v1",
+        model_dir="models/lightgbm",
+        reports_dir="reports/metrics",
+        verbose=True,
+    )
+
+    print("\nSTEP 2: LOADING DATA")
+    X_val = pd.read_csv("data/processed/v1/X_val.csv")
+    X_test = pd.read_csv("data/processed/v1/X_test.csv")
+    y_val = pd.read_csv("data/processed/v1/y_val.csv").iloc[:, 0]
+    y_test = pd.read_csv("data/processed/v1/y_test.csv").iloc[:, 0]
+
     print("\nSTEP 3: VALIDATION EVALUATION")
-    predictor = LightGBMPredictor()
+    loaded_model, _ = load_model(verbose=False)
     evaluator = TriageEvaluator(n_classes=3)
 
-    val_results = predictor.predict(X_val)
-    val_metrics = evaluator.compute_metrics(
-        y_true=y_val.values,
-        y_pred=val_results['predictions'],
-        y_proba=val_results['probabilities']
-    )
-
+    val_pred, val_proba = predict(loaded_model, X_val, return_proba=True)
+    val_metrics = evaluator.compute_metrics(y_true=y_val.values, y_pred=val_pred, y_proba=val_proba)
     print(evaluator.format_results(val_metrics))
 
-    os.makedirs('reports/metrics', exist_ok=True)
-    with open('reports/metrics/lightgbm_val_metrics.json', 'w') as f:
-        json.dump(val_metrics, f, indent=2)
+    os.makedirs("reports/metrics", exist_ok=True)
+    with open("reports/metrics/lightgbm_val_metrics.json", "w", encoding="utf-8") as handle:
+        json.dump(val_metrics, handle, indent=2)
 
-    # STEP 4: Test Evaluation
     print("\nSTEP 4: TEST EVALUATION")
-
-    test_results = predictor.predict(X_test)
-    test_metrics = evaluator.compute_metrics(
-        y_true=y_test.values,
-        y_pred=test_results['predictions'],
-        y_proba=test_results['probabilities']
-    )
-
+    test_pred, test_proba = predict(loaded_model, X_test, return_proba=True)
+    test_metrics = evaluator.compute_metrics(y_true=y_test.values, y_pred=test_pred, y_proba=test_proba)
     print(evaluator.format_results(test_metrics))
 
-    with open('reports/metrics/lightgbm_test_metrics.json', 'w') as f:
-        json.dump(test_metrics, f, indent=2)
+    with open("reports/metrics/lightgbm_test_metrics.json", "w", encoding="utf-8") as handle:
+        json.dump(test_metrics, handle, indent=2)
 
-    # SUMMARY
     print("\nTRAINING SUMMARY")
-    print(f"Validation Macro F1: {val_metrics['macro_f1']:.4f}")
-    print(f"Test Macro F1: {test_metrics['macro_f1']:.4f}")
-
-    print("\n✅ DONE")
+    print(f"Training/Test Macro F1: {train_metrics['macro_f1']:.4f}")
+    print(f"Validation Macro F1:    {val_metrics['macro_f1']:.4f}")
+    print(f"Test Macro F1:          {test_metrics['macro_f1']:.4f}")
 
     return model, val_metrics, test_metrics
 
