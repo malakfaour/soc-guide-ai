@@ -1,8 +1,11 @@
 import { BarChart3, AlertTriangle } from 'lucide-react';
+import { ModelSelector } from '../components/ModelSelector';
 import { useMetrics } from '../hooks/useMetrics';
 import { AccuracyCards } from '../components/charts/AccuracyCards';
+import { ConfidenceDistributionChart } from '../components/charts/ConfidenceDistributionChart';
 import { ClassDistributionChart } from '../components/charts/ClassDistributionChart';
 import { ConfusionMatrix } from '../components/charts/ConfusionMatrix';
+import { useModel } from '../context/ModelContext';
 import { InfoPill, PageHeader, PageShell, Panel } from '../components/ui';
 
 function LoadingSkeleton() {
@@ -21,7 +24,8 @@ function LoadingSkeleton() {
 }
 
 export default function Analytics() {
-  const { loading, error, data } = useMetrics();
+  const { model } = useModel();
+  const { loading, error, data } = useMetrics(model);
 
   return (
     <PageShell className="space-y-6 animate-fade-in">
@@ -29,7 +33,12 @@ export default function Analytics() {
         eyebrow="Analytics"
         title="Backend evaluation breakdown"
         subtitle="Validation metrics rendered for fast inspection, with consistent class color-coding across every chart and summary surface."
-        actions={<InfoPill icon={BarChart3} label="Live endpoint: /metrics" tone="info" />}
+        actions={
+          <>
+            <ModelSelector />
+            <InfoPill icon={BarChart3} label={`Live endpoint: /metrics?model=${model}`} tone="info" />
+          </>
+        }
       />
 
       {loading && <LoadingSkeleton />}
@@ -53,9 +62,11 @@ export default function Analytics() {
           <AccuracyCards accuracy={data.accuracy} macroF1={data.macro_f1} />
 
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-            <ClassDistributionChart confusionMatrix={data.confusion_matrix} />
+            <ClassDistributionChart distribution={data.class_distribution} />
             <ConfusionMatrix matrix={data.confusion_matrix} />
           </div>
+
+          <ConfidenceDistributionChart data={data.confidence_distribution} />
 
           <Panel>
             <p className="mb-4 text-xs font-mono uppercase tracking-[0.24em] text-slate-400">Per-Class Metrics</p>

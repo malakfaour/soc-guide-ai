@@ -68,18 +68,20 @@ def wait_for_backend(process: subprocess.Popen | None, timeout_seconds: int = 90
 
 def wait_for_frontend(process: subprocess.Popen, timeout_seconds: int = 20) -> str:
     deadline = time.time() + timeout_seconds
-    url = ""
+    output_lines: list[str] = []
 
     while time.time() < deadline and process.poll() is None:
         line = process.stdout.readline() if process.stdout else ""
         if line:
+            output_lines.append(line)
             print(f"[frontend] {line.rstrip()}")
-            if "Local:" in line and "http" in line:
-                url = line.split("Local:", 1)[1].strip()
-        if url and "http://localhost:" in url:
-            return url.rstrip("/")
+        if url_is_ready(FRONTEND_URL):
+            return FRONTEND_URL
 
-    return url.rstrip("/") if url else FRONTEND_URL
+    if process.poll() is not None and output_lines:
+        print("".join(output_lines))
+
+    return FRONTEND_URL
 
 
 def stop_process(process: subprocess.Popen) -> None:
