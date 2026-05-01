@@ -131,6 +131,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -185,3 +187,12 @@ cython_debug/
 # Dataset files - ignore raw data but keep folder structure
 data/raw/*
 !data/raw/.gitkeep
+
+# Frontend
+node_modules/
+soc-frontend/node_modules/
+soc-frontend/dist/
+soc-frontend/.env
+
+# Runtime outputs
+logs/

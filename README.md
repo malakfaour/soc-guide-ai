@@ -1,5 +1,6 @@
-# SOC Intelligence
+# SOC Intelligence Platform
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 > AI-powered security operations intelligence for alert triage, model training, and explainable incident classification.
 
@@ -167,94 +168,174 @@ http://127.0.0.1:8000/docs
 - For production deployment, the next step would typically be adding a dedicated worker queue, persistent database, and deployment automation.
 =======
 SOC incident analysis project with a finalized hybrid modeling pipeline.
+=======
+Production-style SOC triage demo that combines a FastAPI ML backend with a React analyst console. The system scores preprocessed security alert feature vectors with XGBoost, LightGBM, or TabNet, surfaces real evaluation metrics, and supports a triage-to-remediation workflow.
+>>>>>>> main
 
-## Final Architecture
+## What It Demonstrates
 
-The project now uses a task-specific final design:
+- **Multi-model inference**: runtime model selection for XGBoost, LightGBM, and TabNet.
+- **Real backend integration**: React calls FastAPI endpoints for prediction, health, metrics, remediation, and processed demo samples.
+- **Preprocessing contract**: frontend sends only numeric preprocessed feature arrays; preprocessing artifacts stay backend-side.
+- **Analytics dashboard**: model accuracy, macro F1, per-class metrics, confusion matrix, and class distribution from saved evaluation outputs.
+- **SOC workflow**: run a prediction, add it to the triage queue, inspect probabilities, and send selected alerts to remediation.
+- **Demo-ready samples**: backend can serve rows directly from `data/processed/v1/X_test.csv` for repeatable testing.
 
-- `TabNet` for row-level triage
-- `LightGBM` as a triage baseline
-- `XGBoost` as a triage baseline
-- `Gradient Boosted Trees` for incident-level `account_response`
-- `Logistic Regression` for incident-level `endpoint_response`
+## Architecture
 
-The runnable hybrid path reuses:
-- [main.py](/c:/Users/malty/Projects/SOC%20Intelligence/main.py)
-- [hybrid_incident_scoring.py](/c:/Users/malty/Projects/SOC%20Intelligence/src/inference/hybrid_incident_scoring.py)
-
-## Current Best-Use Summary
-
-Triage:
-- `LightGBM` currently has the strongest saved triage metrics
-- `XGBoost` is the next strongest triage baseline
-- `TabNet` remains the deep-learning triage model used by the hybrid pipeline
-
-Remediation:
-- `Gradient Boosted Trees` is the selected model for `account_response`
-- `Logistic Regression` is the selected model for `endpoint_response`
-- remediation stays incident-level because that matches the label granularity
-
-## Saved Artifacts
-
-TabNet triage:
-- [triage_model.zip](/c:/Users/malty/Projects/SOC%20Intelligence/models/tabnet/triage_model.zip)
-- [triage_model_config.json](/c:/Users/malty/Projects/SOC%20Intelligence/models/tabnet/triage_model_config.json)
-- [triage_model_scaler.pkl](/c:/Users/malty/Projects/SOC%20Intelligence/models/tabnet/triage_model_scaler.pkl)
-
-LightGBM triage:
-- [triage_model.pkl](/c:/Users/malty/Projects/SOC%20Intelligence/models/lightgbm/triage_model.pkl)
-- [triage_model_config.json](/c:/Users/malty/Projects/SOC%20Intelligence/models/lightgbm/triage_model_config.json)
-
-XGBoost triage:
-- [triage_model.pkl](/c:/Users/malty/Projects/SOC%20Intelligence/models/xgboost/triage_model.pkl)
-- [triage_model_config.json](/c:/Users/malty/Projects/SOC%20Intelligence/models/xgboost/triage_model_config.json)
-
-Classical remediation:
-- [account_response_gbt.pkl](/c:/Users/malty/Projects/SOC%20Intelligence/models/classical/account_response_gbt.pkl)
-- [endpoint_response_lr.pkl](/c:/Users/malty/Projects/SOC%20Intelligence/models/classical/endpoint_response_lr.pkl)
-- [incident_scaler.pkl](/c:/Users/malty/Projects/SOC%20Intelligence/models/classical/incident_scaler.pkl)
-- [remediation_thresholds.json](/c:/Users/malty/Projects/SOC%20Intelligence/models/classical/remediation_thresholds.json)
-- [remediation_model_metadata.json](/c:/Users/malty/Projects/SOC%20Intelligence/models/classical/remediation_model_metadata.json)
-
-## Key Reports
-
-Metrics:
-- [triage_metrics.json](/c:/Users/malty/Projects/SOC%20Intelligence/reports/metrics/triage_metrics.json)
-- [lightgbm_triage_metrics.json](/c:/Users/malty/Projects/SOC%20Intelligence/reports/metrics/lightgbm_triage_metrics.json)
-- [xgboost_triage_metrics.json](/c:/Users/malty/Projects/SOC%20Intelligence/reports/metrics/xgboost_triage_metrics.json)
-- [classical_remediation_comparison.json](/c:/Users/malty/Projects/SOC%20Intelligence/reports/metrics/classical_remediation_comparison.json)
-
-Comparisons:
-- [tabnet_vs_lightgbm_triage.json](/c:/Users/malty/Projects/SOC%20Intelligence/reports/comparisons/tabnet_vs_lightgbm_triage.json)
-- [tabnet_vs_xgboost_triage.json](/c:/Users/malty/Projects/SOC%20Intelligence/reports/comparisons/tabnet_vs_xgboost_triage.json)
-- [endpoint_response_limitations.md](/c:/Users/malty/Projects/SOC%20Intelligence/reports/comparisons/endpoint_response_limitations.md)
-
-Figures:
-- [feature_importance.png](/c:/Users/malty/Projects/SOC%20Intelligence/reports/figures/feature_importance.png)
-- [step_importance.png](/c:/Users/malty/Projects/SOC%20Intelligence/reports/figures/step_importance.png)
-- [tabnet_explainability_report.json](/c:/Users/malty/Projects/SOC%20Intelligence/reports/figures/tabnet_explainability_report.json)
-
-## Final Validation Commands
-
-Run the saved-model inference paths:
-
-```powershell
-python src\models\lightgbm\predict.py
-python src\models\xgboost\predict.py
-python main.py --row-limit 3 --incident-limit 1
+```text
+React + Vite frontend
+  -> /predict
+  -> /metrics
+  -> /sample-features
+  -> /remediation-predict
+FastAPI backend
+  -> saved ML models
+  -> processed datasets
+  -> evaluation reports
 ```
 
-Re-run training baselines only if needed:
+Key paths:
+
+- `app.py`: FastAPI inference API.
+- `soc-frontend/`: React SOC console.
+- `models/`: saved triage and remediation models.
+- `models/artifacts/`: preprocessing artifacts.
+- `data/processed/v1/`: preprocessed train/validation/test feature files.
+- `reports/metrics/`: saved model evaluation metrics.
+- `tests/`: lightweight backend API tests.
+
+## Tech Stack
+
+- Backend: FastAPI, Pydantic, NumPy, pandas, scikit-learn, joblib.
+- ML: XGBoost, LightGBM, PyTorch TabNet, classical scikit-learn remediation models.
+- Frontend: React, TypeScript, Vite, Tailwind CSS, Recharts.
+- Testing: pytest, FastAPI TestClient.
+
+## Setup
 
 ```powershell
-python src\models\lightgbm\train.py
-python src\models\xgboost\train.py
-python compare_remediation_baselines.py
+cd "C:\Users\malty\Projects\SOC Intelligence"
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+
+cd soc-frontend
+npm install
 ```
 
-## Final Notes
+Optional frontend API override:
 
+<<<<<<< HEAD
 - Triage and remediation are intentionally separated now.
 - `endpoint_response` remains the weakest label because it is low-signal and has very few positive incidents.
 - The project is best understood as a hybrid system, not a single-model system.
 >>>>>>> origin/main
+=======
+```powershell
+Copy-Item .env.example .env
+```
+
+## One-Command Demo
+
+From the project root:
+
+```powershell
+.\run_demo.bat
+```
+
+This starts:
+
+- FastAPI backend at `http://localhost:8000`
+- React frontend at `http://localhost:5173`
+- Browser opens automatically
+
+Stop both services with `Ctrl+C`.
+
+## Manual Run
+
+Backend:
+
+```powershell
+cd "C:\Users\malty\Projects\SOC Intelligence"
+.\.venv\Scripts\python.exe -m uvicorn app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Frontend:
+
+```powershell
+cd "C:\Users\malty\Projects\SOC Intelligence\soc-frontend"
+npm run dev -- --host 0.0.0.0
+```
+
+## Demo Flow
+
+1. Open the frontend and go to **Triage**.
+2. Choose a model: XGBoost, LightGBM, or TabNet.
+3. Click **Load processed test row** to fetch a real 44-feature row from `X_test.csv`.
+4. Click **Run Prediction**.
+5. Add the result to the triage queue.
+6. Open the queued prediction and send it to remediation.
+7. Visit **Analytics** to show real `/metrics` evaluation graphs.
+
+## API
+
+- `GET /health`: backend and model loading status.
+- `POST /predict`: score a preprocessed numeric feature vector.
+- `GET /sample-features`: return a real processed feature row for demo/testing.
+- `POST /remediation-predict`: score incident-level remediation needs.
+- `GET /metrics`: return saved evaluation metrics.
+- `POST /evaluate`: return saved evaluation metrics with source metadata.
+
+Prediction request:
+
+```json
+{
+  "features": [0.1, 0.2, 0.3],
+  "model": "lightgbm"
+}
+```
+
+Prediction response:
+
+```json
+{
+  "prediction": 1,
+  "probabilities": [0.05, 0.91, 0.04],
+  "model": "lightgbm"
+}
+```
+
+## Testing
+
+Backend:
+
+```powershell
+cd "C:\Users\malty\Projects\SOC Intelligence"
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Frontend:
+
+```powershell
+cd "C:\Users\malty\Projects\SOC Intelligence\soc-frontend"
+npm run typecheck
+npm run build
+```
+
+## Screenshots
+
+Add final screenshots before publishing:
+
+- `docs/screenshots/dashboard.png`
+- `docs/screenshots/triage.png`
+- `docs/screenshots/analytics.png`
+- `docs/screenshots/remediation.png`
+
+## Notes
+
+- The frontend intentionally does not preprocess raw CSVs.
+- Raw GUIDE data belongs in the preprocessing pipeline, not `/predict`.
+- TabNet requires `pytorch-tabnet`; install `requirements.txt` before demoing all three models.
+- Large raw datasets are ignored by git. Keep saved models and processed demo data available for local demos.
+>>>>>>> main

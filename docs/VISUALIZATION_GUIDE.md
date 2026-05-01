@@ -222,18 +222,17 @@ self.colors = {
 }
 ```
 
-## Example: Running Visualization Guide
+## Example: Generating Final Figures
 
 ```bash
 # From project root
-python visualization_integration_guide.py
+python src/evaluation/generate_final_figures.py
 ```
 
 This will:
-1. Generate example visualizations with mock data
-2. Show how to load metrics from files
-3. Demonstrate individual plot generation
-4. Show integration with training pipeline
+1. Load saved evaluation metrics
+2. Generate publication-ready figures into `reports/figures`
+3. Refresh the final figures manifest
 
 ## Advanced Usage
 
@@ -295,7 +294,7 @@ All are in `requirements.txt`.
 
 - `src/visualization/model_comparisons.py` - Main module (320+ lines)
 - `src/visualization/__init__.py` - Package initialization
-- `visualization_integration_guide.py` - Usage examples and guide
+- `src/evaluation/generate_final_figures.py` - Demo/report figure generation
 
 ## Notes
 
