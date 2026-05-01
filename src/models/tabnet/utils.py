@@ -79,8 +79,8 @@ class TabNetScaler:
         X_train_scaled = self.scaler.fit_transform(X_train)
         self.is_fitted = True
         
-        print(f"  ✓ Scaler fitted on {X_train.shape[0]} training samples")
-        print(f"  ✓ Training data scaled shape: {X_train_scaled.shape}")
+        print(f"  [OK] Scaler fitted on {X_train.shape[0]} training samples")
+        print(f"  [OK] Training data scaled shape: {X_train_scaled.shape}")
         
         return X_train_scaled
     
@@ -120,7 +120,7 @@ class TabNetScaler:
             raise ValueError(f"{split_name} contains NaN values")
         
         X_scaled = self.scaler.transform(X)
-        print(f"  ✓ {split_name} data scaled: {X.shape} → {X_scaled.shape}")
+        print(f"  [OK] {split_name} data scaled: {X.shape} -> {X_scaled.shape}")
         
         return X_scaled
     
@@ -212,8 +212,8 @@ def scale_tabnet_features(
     
     if verbose:
         print("\n[SCALING] Validation:")
-        print("  ✓ Scaler fitted only on training data (no data leakage)")
-        print("  ✓ All splits have same feature dimension")
+        print("  [OK] Scaler fitted only on training data (no data leakage)")
+        print("  [OK] All splits have same feature dimension")
         print(f"  ✓ Scaled data dtype: {X_train_scaled.dtype}")
         
         # Show scaling effect on features

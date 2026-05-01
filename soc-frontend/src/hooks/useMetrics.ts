@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getMetrics, MetricsResponse } from '../services/api';
+import type { PredictionModel } from '../types/alert';
 
 interface MetricsState {
   loading: boolean;
@@ -7,7 +8,7 @@ interface MetricsState {
   data: MetricsResponse | null;
 }
 
-export function useMetrics() {
+export function useMetrics(model: PredictionModel) {
   const [state, setState] = useState<MetricsState>({
     loading: true,
     error: null,
@@ -20,7 +21,7 @@ export function useMetrics() {
     const load = async () => {
       setState({ loading: true, error: null, data: null });
       try {
-        const data = await getMetrics();
+        const data = await getMetrics(model);
         if (!cancelled) {
           setState({ loading: false, error: null, data });
         }
@@ -36,7 +37,7 @@ export function useMetrics() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [model]);
 
   return state;
 }

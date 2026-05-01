@@ -19,10 +19,25 @@ export interface MetricsClassStats {
   support?: number;
 }
 
+export interface ConfidenceDistributionBucket {
+  bucket: string;
+  count: number;
+}
+
+export interface AlertsOverTimePoint {
+  date: string;
+  FalsePositive: number;
+  BenignPositive: number;
+  TruePositive: number;
+}
+
 export interface MetricsResponse {
   confusion_matrix: number[][];
   accuracy: number;
   macro_f1: number;
+  class_distribution: Record<string, number>;
+  confidence_distribution: ConfidenceDistributionBucket[];
+  alerts_over_time: AlertsOverTimePoint[];
   per_class: Record<string, MetricsClassStats>;
 }
 
@@ -113,8 +128,8 @@ export async function remediationPredict(incidentFeatures: number[]): Promise<Re
   return await res.json() as RemediationResponse;
 }
 
-export async function getMetrics(): Promise<MetricsResponse> {
-  const res = await fetch(`${BASE_URL}/metrics`);
+export async function getMetrics(model: string): Promise<MetricsResponse> {
+  const res = await fetch(`${BASE_URL}/metrics?model=${model}`);
   if (!res.ok) {
     throw new Error('Failed to fetch metrics');
   }
