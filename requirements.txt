@@ -1,6 +1,11 @@
+streamlit
 pandas
 numpy
+lightgbm
 scikit-learn
+<<<<<<< HEAD
+joblib
+=======
 lightgbm
 xgboost
 matplotlib
@@ -9,7 +14,11 @@ jupyter
 catboost
 torch
 shap
+<<<<<<< HEAD
 fastapi
 uvicorn[standard]
 pydantic
 joblib
+=======
+>>>>>>> origin/main
+>>>>>>> feature/lightgbm
