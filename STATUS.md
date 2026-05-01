@@ -316,7 +316,7 @@ These are ready for implementation when needed.
 
 - **Branch**: project-setup
 - **Latest Commit**: 7b3f769 "Implement complete preprocessing pipeline for GUIDE dataset"
-- **Pushed to**: https://github.com/malakfaour/soc-guide-ai/tree/project-setup
+- **Pushed to**: https://github.com/malakfaour/soc-intelligence/tree/main
 
 ## Performance Characteristics
 

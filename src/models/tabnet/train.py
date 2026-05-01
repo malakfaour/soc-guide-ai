@@ -23,10 +23,11 @@ from utils import (
 )
 
 try:
-    from pytorch_tabnet.tab_classifier import TabNetClassifier
-except ImportError:
-    print("[ERROR] pytorch_tabnet not installed. Install with:")
-    print("  pip install pytorch-tabnet")
+    from pytorch_tabnet.tab_model import TabNetClassifier
+except Exception as e:
+    print("[ERROR] Failed to import TabNetClassifier from pytorch_tabnet.tab_model")
+    print(f"  Root cause: {type(e).__name__}: {e}")
+    print("  Verify that both pytorch-tabnet and torch import cleanly.")
     sys.exit(1)
 
 
@@ -100,7 +101,7 @@ def train_tabnet_triage_model(
         print("\n[STEP 2] Feature Scaling (QuantileTransformer)")
     
     X_train_scaled, X_val_scaled, X_test_scaled, scaler = scale_tabnet_features(
-        X_train, X_val, X_test, verbose=False
+        X_train, X_val, X_test, verbose=True
     )
     
     if verbose:
@@ -118,11 +119,7 @@ def train_tabnet_triage_model(
         for class_label, weight in sorted(class_weights.items()):
             print(f"  ✓ Class {class_label}: {weight:.4f}")
     
-    # Convert dict to array format for TabNet
     n_classes = len(np.unique(y_train))
-    class_weights_array = np.array([
-        class_weights.get(i, 1.0) for i in range(n_classes)
-    ])
     
     # ===== STEP 4: CONFIGURE TABNET CLASSIFIER =====
     if verbose:
@@ -140,7 +137,8 @@ def train_tabnet_triage_model(
         'momentum': 0.02,               # Momentum for batch norm
         'epsilon': 1e-15,               # Batch norm epsilon
         'seed': 42,
-        'verbose': 0,  # 0 for silent, 1 for epoch-level, 2 for detailed
+        'optimizer_params': {'lr': 2e-2, 'weight_decay': 1e-5},
+        'verbose': 1 if verbose else 0,  # TabNet logging is configured on the model
     }
     
     # Merge with custom params if provided
@@ -164,22 +162,22 @@ def train_tabnet_triage_model(
         print("  Training on training set with validation monitoring...")
     
     # Train with early stopping on validation metric
+    print("  ⏳ Starting model training (this may take several minutes)...")
     model.fit(
         X_train=X_train_scaled,
         y_train=y_train,
         eval_set=[(X_val_scaled, y_val)],  # Validation for early stopping
-        eval_metric=['auc'],              # Metric to monitor
+        eval_metric=['balanced_accuracy'],  # Better suited for imbalanced classes
         max_epochs=200,
         patience=20,                      # Stop if no improvement for 20 epochs
         batch_size=256,
         virtual_batch_size=128,
         num_workers=0,
-        weight_decay=1e-5,
-        class_weights=class_weights_array,  # Handle class imbalance
+        weights=class_weights,  # Handle class imbalance
     )
     
     if verbose:
-        print(f"  ✓ Training completed (stopped at epoch)")
+        print(f"  ✓ Training completed!")
     
     # ===== STEP 6: MAKE PREDICTIONS =====
     if verbose:
