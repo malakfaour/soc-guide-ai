@@ -1,39 +1,8 @@
-<<<<<<< HEAD
-﻿# TODO
-import pandas as pd
-from xgboost import XGBClassifier
-import numpy as np
-
-def load_model():
-    model = XGBClassifier()
-    model.load_model("models/xgboost_model.json")
-    return model
-
-
-def predict(model, data):
-    if hasattr(data, "values"):
-        data = data.values
-
-    proba = model.predict_proba(data)
-    pred = np.argmax(proba, axis=1)
-
-    return pred, proba
-
-
-if __name__ == "__main__":
-    model = load_model()
-
-    # Example input (replace with real data)
-    sample = pd.read_csv("data/processed/v1/X_test.csv").iloc[:5]
-
-    preds, probs = predict(model, sample)
-
-    print("Predictions:", preds)
-    print("Probabilities:\n", probs)
-=======
 """
 XGBoost triage baseline inference.
 """
+
+from __future__ import annotations
 
 import json
 import sys
@@ -61,6 +30,7 @@ def load_model(
     verbose: bool = True,
 ) -> Tuple[Any, Dict[str, Any]]:
     """Load a saved XGBoost model, preferring the packaged triage artifact."""
+
     model_path = PROJECT_ROOT / model_dir / f"{model_name}.pkl"
     config_path = PROJECT_ROOT / model_dir / f"{model_name}_config.json"
 
@@ -109,6 +79,7 @@ def predict(
     return_proba: bool = True,
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """Generate triage predictions using the saved XGBoost model."""
+
     if isinstance(data, pd.DataFrame):
         array = data.to_numpy(dtype=np.float32)
     else:
@@ -141,4 +112,3 @@ if __name__ == "__main__":
             indent=2,
         )
     )
->>>>>>> origin/main
