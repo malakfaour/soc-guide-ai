@@ -8,7 +8,7 @@ from src.training.train_tabnet import load_tabnet_data
 
 def run_evaluation():
     print("Loading model...")
-    model, scaler, _, _ = load_tabnet_model()
+    model, scaler, _ = load_tabnet_model()
 
     print("Loading data...")
     X_train, X_val, X_test, y_train, y_val, y_test = load_tabnet_data()
@@ -17,7 +17,8 @@ def run_evaluation():
     # 1. CONFUSION MATRIX
     # =========================
     print("Plotting Confusion Matrix...")
-    y_pred = model.predict(X_test)
+    X_test_scaled = scaler.transform(X_test, split_name="Evaluation")
+    y_pred = model.predict(X_test_scaled)
 
     cm = confusion_matrix(y_test, y_pred)
 
