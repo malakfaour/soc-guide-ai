@@ -1,18 +1,11 @@
-<<<<<<< HEAD
-﻿from xgboost import XGBClassifier
-import numpy as np
-from sklearn.utils.class_weight import compute_class_weight
-
-
-def compute_sample_weights(y):
-    y_array = y.values.ravel()
-=======
 """
 XGBoost triage baseline training utilities.
 
 Supports both the reusable triage artifact pipeline under ``models/xgboost/``
-and the existing training helpers used by ``src/training/train.py``.
+and the legacy training helpers used by ``src/training/train.py``.
 """
+
+from __future__ import annotations
 
 import json
 import sys
@@ -43,7 +36,8 @@ def save_triage_comparison(
     xgboost_metrics: Dict[str, Any],
     reports_dir: str = "reports",
 ) -> Path:
-    """Save an XGBoost vs TabNet triage comparison using existing saved metrics."""
+    """Save an XGBoost vs TabNet comparison using existing saved metrics."""
+
     reports_root = PROJECT_ROOT / reports_dir
     comparisons_dir = reports_root / "comparisons"
     comparisons_dir.mkdir(parents=True, exist_ok=True)
@@ -57,6 +51,7 @@ def save_triage_comparison(
             "overall_accuracy": xgboost_metrics["overall_accuracy"],
         }
     }
+
     if tabnet_metrics_path.exists():
         with open(tabnet_metrics_path, "r", encoding="utf-8") as handle:
             tabnet_metrics = json.load(handle)
@@ -83,11 +78,13 @@ def load_xgboost_data(
     verbose: bool = True,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, list[str]]:
     """Load the existing processed triage dataset for XGBoost."""
+
     X_train, X_val, X_test, y_train, y_val, y_test = load_dataset_by_version(
         version=version,
         verbose=verbose,
     )
     feature_names = X_train.columns.tolist()
+
     return (
         X_train.to_numpy(dtype=np.float32),
         X_val.to_numpy(dtype=np.float32),
@@ -101,20 +98,12 @@ def load_xgboost_data(
 
 def compute_sample_weights(y) -> Tuple[np.ndarray, Dict[int, float]]:
     """Compute balanced sample weights for class-imbalanced training."""
-    y_array = y.values.ravel() if hasattr(y, "values") else np.asarray(y).ravel()
->>>>>>> origin/main
-    classes = np.unique(y_array)
 
+    y_array = y.values.ravel() if hasattr(y, "values") else np.asarray(y).ravel()
+    classes = np.unique(y_array)
     class_weights = compute_class_weight(
         class_weight="balanced",
         classes=classes,
-<<<<<<< HEAD
-        y=y_array
-    )
-
-    class_weight_dict = dict(zip(classes, class_weights))
-    sample_weights = np.array([class_weight_dict[label] for label in y_array])
-=======
         y=y_array,
     )
 
@@ -122,22 +111,14 @@ def compute_sample_weights(y) -> Tuple[np.ndarray, Dict[int, float]]:
         int(label): float(weight)
         for label, weight in zip(classes, class_weights)
     }
-    sample_weights = np.array([class_weight_dict[int(label)] for label in y_array])
->>>>>>> origin/main
+    sample_weights = np.array(
+        [class_weight_dict[int(label)] for label in y_array],
+        dtype=np.float32,
+    )
 
     return sample_weights, class_weight_dict
 
 
-<<<<<<< HEAD
-def train_xgboost_model(X_train, y_train, X_val, y_val, sample_weights):
-    # Convert y to 1D
-    y_train = y_train.values.ravel()
-    y_val = y_val.values.ravel()
-
-    model = XGBClassifier(
-        objective="multi:softprob",
-        num_class=3,
-=======
 def train_xgboost_model(
     X_train,
     y_train,
@@ -145,16 +126,20 @@ def train_xgboost_model(
     y_val,
     sample_weights=None,
 ) -> XGBClassifier:
-    """Train the legacy JSON-export XGBoost model used by the FastAPI app."""
+    """Train the legacy XGBoost model helper used by older scripts."""
+
     X_train_array = X_train.values if hasattr(X_train, "values") else X_train
     X_val_array = X_val.values if hasattr(X_val, "values") else X_val
-    y_train_array = y_train.values.ravel() if hasattr(y_train, "values") else np.asarray(y_train).ravel()
-    y_val_array = y_val.values.ravel() if hasattr(y_val, "values") else np.asarray(y_val).ravel()
+    y_train_array = (
+        y_train.values.ravel() if hasattr(y_train, "values") else np.asarray(y_train).ravel()
+    )
+    y_val_array = (
+        y_val.values.ravel() if hasattr(y_val, "values") else np.asarray(y_val).ravel()
+    )
 
     model = XGBClassifier(
         objective="multi:softprob",
         num_class=len(np.unique(y_train_array)),
->>>>>>> origin/main
         eval_metric="mlogloss",
         n_estimators=2000,
         learning_rate=0.05,
@@ -165,43 +150,8 @@ def train_xgboost_model(
         gamma=0.1,
         random_state=42,
         early_stopping_rounds=50,
-<<<<<<< HEAD
-
-        # ✅ GPU settings (fixed)
-         # ✅ correct GPU usage
-       
         tree_method="hist",
-        device="cuda"
-    )
-
-    model.fit(
-        X_train,
-        y_train,
-        sample_weight=sample_weights,
-        eval_set=[(X_val, y_val)],
-        verbose=100
-    )
-
-    return model
-
-
-def predict_with_threshold(model, X, high_threshold=0.35):
-    if hasattr(X, "values"):
-        X = X.values
-
-    proba = model.predict_proba(X)
-
-    # Apply threshold for class "High"
-    y_pred = np.where(
-        proba[:, 2] > high_threshold,
-        2,
-        np.argmax(proba, axis=1)
-    )
-
-    return y_pred, proba
-=======
-        tree_method="hist",
-        device="cuda",
+        n_jobs=-1,
     )
 
     fit_kwargs = {
@@ -215,8 +165,13 @@ def predict_with_threshold(model, X, high_threshold=0.35):
     return model
 
 
-def predict_with_threshold(model: XGBClassifier, X, high_threshold: float = 0.35):
+def predict_with_threshold(
+    model: XGBClassifier,
+    X,
+    high_threshold: float = 0.35,
+):
     """Bias predictions toward the highest-severity class when confidence is sufficient."""
+
     X_array = X.values if hasattr(X, "values") else X
     probabilities = model.predict_proba(X_array)
     predictions = np.where(
@@ -234,6 +189,7 @@ def train_xgboost_triage_model(
     verbose: bool = True,
 ) -> Tuple[XGBClassifier, Dict[str, Any]]:
     """Train the reusable triage baseline and save model, config, and metrics."""
+
     (
         X_train,
         X_val,
@@ -332,4 +288,3 @@ if __name__ == "__main__":
             indent=2,
         )
     )
->>>>>>> origin/main
